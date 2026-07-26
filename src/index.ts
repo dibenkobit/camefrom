@@ -1,3 +1,4 @@
+import { intercept } from './intercept';
 import type { Provenance } from './types';
 
 export type { Hop, Provenance, RequestMeta } from './types';
@@ -13,8 +14,7 @@ let installed = false;
 export function install(): void {
     if (installed) return;
     installed = true;
-    // TODO: patch fetch, XMLHttpRequest and JSON.parse; wrap parsed bodies in
-    // lazy proxies; record reads into a ring buffer.
+    intercept();
 }
 
 /**
