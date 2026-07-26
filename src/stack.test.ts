@@ -72,6 +72,42 @@ describe("callSite", () => {
 		expect(callSite(doubled)?.file).toBe("/src/cell.tsx");
 	});
 
+	test("reads a path with brackets of its own in it", () => {
+		// A route group — `(table)`, `(layout)` — is a directory name, and the
+		// bracket it is spelled with sits inside the brackets V8 wraps the
+		// location in. The component that wrote the element lives in one of
+		// these in every project that groups routes that way.
+		const grouped = [
+			"Error: react-stack-top-frame",
+			"    at jsxDEV (http://localhost:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js:250:23)",
+			"    at SitesTable (http://localhost:5173/src/app/sites/(table)/sites.table.tsx?t=1753500000000:12:17)",
+			"    at react_stack_bottom_frame (http://localhost:5173/node_modules/.vite/deps/chunk-ABC.js:17422:20)",
+		].join("\n");
+
+		expect(callSite(grouped)).toEqual({
+			file: "/src/app/sites/(table)/sites.table.tsx",
+			line: 12,
+			column: 17,
+			bundle:
+				"http://localhost:5173/src/app/sites/(table)/sites.table.tsx?t=1753500000000",
+		});
+	});
+
+	test("splits a Firefox frame on the separator, not on the path", () => {
+		// `/@fs/` is how Vite serves a file from outside the project root, so the
+		// `@` that separates the name from the URL is not the only one in the line.
+		const outside = [
+			"jsxDEV@http://localhost:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js:250:23",
+			"Cell@http://localhost:5173/@fs/Users/me/lib/table.tsx:8:5",
+		].join("\n");
+
+		expect(callSite(outside)).toMatchObject({
+			file: "/Users/me/lib/table.tsx",
+			line: 8,
+			column: 5,
+		});
+	});
+
 	test("ignores a frame with no position to give", () => {
 		const anonymous = [
 			"Error: react-stack-top-frame",

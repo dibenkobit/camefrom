@@ -58,18 +58,41 @@ export function fileOf(url: string): string | undefined {
 	return path.startsWith("/") ? path : undefined;
 }
 
+/**
+ * The location V8 wraps in parentheses when it also names the function.
+ *
+ * Balanced from the end rather than read as "brackets with nothing bracketed
+ * inside them": a route group is a directory literally called `(table)`, and a
+ * URL carrying one used to fail the match and take the whole frame with it. The
+ * component's own line was the frame lost, so the panel stopped at its caller.
+ */
+function parenthesised(text: string): string | undefined {
+	if (!text.endsWith(")")) return undefined;
+
+	let depth = 0;
+	for (let at = text.length - 1; at >= 0; at--) {
+		const character = text[at];
+		if (character === ")") depth++;
+		else if (character === "(") {
+			depth--;
+			if (depth === 0) return text.slice(at + 1, -1);
+		}
+	}
+	return undefined;
+}
+
 /** One frame, in any of the three shapes a browser might have written it. */
 function frameOf(line: string): Position | undefined {
 	const text = line.trim();
-
-	// V8 wraps the location in parentheses when it also names the function.
-	const parenthesised = /\(([^()]*)\)$/.exec(text);
-	let location = parenthesised?.[1];
+	let location = parenthesised(text);
 
 	if (location === undefined) {
 		// `at url:line:column` in V8, `name@url:line:column` everywhere else.
 		const at = text.startsWith("at ") ? text.slice(3) : text;
-		const marker = at.lastIndexOf("@");
+		// The first `@`, not the last: a function name never carries one and a
+		// URL routinely does. `/@fs/…` is how Vite serves a file from outside the
+		// project root, and `@scope/name` is most of `node_modules`.
+		const marker = at.indexOf("@");
 		location = marker === -1 ? at : at.slice(marker + 1);
 	}
 
