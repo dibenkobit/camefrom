@@ -27,6 +27,10 @@ jobs:
         id: release
         with:
           release-type: node
+          # Below 1.0.0 a feature is a minor, not a major. The engine has no
+          # panel yet; calling that 1.0.0 would promise an API we have not
+          # earned.
+          bump-minor-pre-major: true
 
   publish:
     needs: prepare
