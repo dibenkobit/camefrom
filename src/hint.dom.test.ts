@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import { hide, summarize, watch } from "./hint";
+import { own } from "./pointer";
 import { recordResponse, reset } from "./store";
 import { taint } from "./taint";
 import type { Provenance } from "./types";
@@ -97,6 +98,9 @@ function move(target: Node, x = 10, y = 10, altKey = true): PointerEvent {
 		clientY: y,
 		bubbles: true,
 		cancelable: true,
+		// As a real pointer event is: without this one dispatched inside a shadow
+		// root would stop at its boundary and never reach the document.
+		composed: true,
 	});
 	target.dispatchEvent(event);
 	return event;
@@ -299,6 +303,50 @@ describe("what it costs", () => {
 		hover(other);
 		hover(cell);
 		expect(said()).toContain("items[0].contractor.name");
+	});
+});
+
+describe("over the tool's own UI", () => {
+	/**
+	 * A shadow host of ours, holding text the hint could answer for.
+	 *
+	 * Not the real panel: `panel.ts` mounts itself once against whichever ambient
+	 * document it first saw, and these suites share a process, so the panel's own
+	 * suite is the one that can own it. What the hint promises is that anything
+	 * marked as ours is left alone; that the panel marks itself is what
+	 * `panel.dom.test.ts` holds it to.
+	 */
+	function ours(text: string): Node {
+		const host = document.createElement("div");
+		own(host, "panel");
+		document.body.append(host);
+
+		const inside = document.createElement("div");
+		inside.textContent = text;
+		host.attachShadow({ mode: "open" }).append(inside);
+		return inside;
+	}
+
+	test("nothing is shown, for text that would otherwise answer", () => {
+		seed({ items: [{ contractor: { name: "ТОО Барыс" } }] });
+
+		// The panel prints the response body it was traced out of, so its text is
+		// text this tool can trace — and tracing it is the tool reading itself.
+		hover(ours("ТОО Барыс"));
+		expect(shown()).toBe(false);
+	});
+
+	test("a hint already on screen is taken off on the way in", () => {
+		seed({ items: [{ contractor: { name: "ТОО Барыс" } }] });
+		hover(render("<div>ТОО Барыс</div>"));
+		expect(shown()).toBe(true);
+
+		// After `render()`, which writes the whole body and would take the host
+		// with it.
+		hover(ours("ТОО Барыс"));
+		expect(shown()).toBe(false);
+		// And no frame is left queued to put it back.
+		expect(pending()).toBe(0);
 	});
 });
 

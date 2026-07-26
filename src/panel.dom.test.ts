@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import { beside, hide, show, within } from "./panel";
+import { ours } from "./pointer";
 import { format } from "./report";
 import type { Provenance } from "./types";
 
@@ -327,6 +328,30 @@ describe("a frame with no line of its own", () => {
 		part(".why.link").click();
 		expect(part(".stack").hidden).toBe(true);
 		expect(part(".why.link").textContent).toContain("show it");
+	});
+});
+
+describe("the host it lives in", () => {
+	test("is marked as ours, so neither path traces what the panel shows", () => {
+		show(traced());
+
+		// Asked from the document, where both paths ask it: an event inside a
+		// shadow root has no composed path left once the dispatch is over.
+		const asked: boolean[] = [];
+		const listener = (event: Event): void => {
+			asked.push(ours(event));
+		};
+		document.addEventListener("pointermove", listener, true);
+		try {
+			pointer("pointermove", part(".body"), { clientX: 40, clientY: 40 });
+			pointer("pointermove", document.body, { clientX: 5, clientY: 5 });
+		} finally {
+			document.removeEventListener("pointermove", listener, true);
+		}
+
+		// The page around the panel stays traceable, which is the whole point of
+		// the tool and the half a marker on everything would break.
+		expect(asked).toEqual([true, false]);
 	});
 });
 

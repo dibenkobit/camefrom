@@ -1,7 +1,7 @@
 import { hide as hideHint, watch as watchHint } from "./hint";
 import { intercept } from "./intercept";
 import { type Point, show } from "./panel";
-import { nodeAt } from "./pointer";
+import { nodeAt, ours } from "./pointer";
 import { report } from "./report";
 import { resolve } from "./resolve";
 import type { Provenance } from "./types";
@@ -36,6 +36,10 @@ function listen(): void {
 		"click",
 		(event) => {
 			if (!event.altKey) return;
+			// A click on the panel belongs to the panel, and quietly: saying "no
+			// text under the pointer" for its own text would be answering a
+			// question nobody asked.
+			if (ours(event)) return;
 
 			const found = resolve(nodeAt(event));
 			if (!found) {

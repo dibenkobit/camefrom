@@ -1,4 +1,4 @@
-import { nodeAt } from "./pointer";
+import { nodeAt, ours, own } from "./pointer";
 import { title } from "./report";
 import { resolve } from "./resolve";
 import { revision } from "./store";
@@ -191,7 +191,7 @@ function mount(): View {
 	}
 
 	const host = element("div");
-	host.setAttribute("data-camefrom", "hint");
+	own(host, "hint");
 	host.style.setProperty("all", "initial");
 	// Never eat a pointer event: the app has to keep receiving them, and hit
 	// testing has to keep reaching the text under the label rather than the
@@ -301,6 +301,13 @@ function moved(event: PointerEvent): void {
 	// This runs on every pointer move on the page, so alt not being held has to
 	// cost a boolean and nothing else.
 	if (!event.altKey) {
+		hide();
+		return;
+	}
+
+	// Over the panel there is nothing to preview: what it says is already on
+	// screen, in more detail than a line under the pointer could hold.
+	if (ours(event)) {
 		hide();
 		return;
 	}

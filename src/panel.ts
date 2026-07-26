@@ -1,5 +1,6 @@
 import { innermost } from "./fiber";
 import { type PrintedJson, print } from "./json";
+import { own } from "./pointer";
 import { format, title } from "./report";
 import { type Excerpt, excerptOf } from "./source";
 import { written } from "./sourcemap";
@@ -171,6 +172,7 @@ function mount(): ShadowRoot {
 	}
 
 	const host = element("div");
+	own(host, "panel");
 	host.style.setProperty("all", "initial");
 	shadow = host.attachShadow({ mode: "open" });
 	shadow.append(element("style", undefined, STYLE));
