@@ -111,7 +111,20 @@ statuses the text alone cannot say, so the answer comes from the record React
 handed the component: which field of it equals the text, and where that record
 sits in the body — placed by the fields it kept, so `{ ...row }`, an immer
 draft or a `select` that renamed half of them still lands on the right row.
-When even that leaves two candidates, you get both of them, not the first:
+
+Plenty of tables hand a component no record at all. A cell built inline —
+`rows.map(row => <Cell>{value(row)}</Cell>)` — keeps the row in the parent's own
+render and passes everything below it a finished string, and then there is
+nothing in the props to place. The page answers instead: the rest of what that
+row shows came out of the same record, and a name in the cell next door settles
+it. A row of nulls that shows nothing of its own is counted off against the rows
+around it that can be placed — which reads a table that has been sorted,
+filtered, paginated or virtualised just as correctly, because it never assumes
+the fifth row on screen is `[4]`.
+
+Every one of those either rules the other candidates out or leaves the list
+alone; none of them weighs candidates up. Where two survive, you get both of
+them, not the first:
 
 ```
 camefrom "Alpyspayev Bakhtiyar"

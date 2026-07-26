@@ -26,6 +26,49 @@ export function joinPath(base: string, relative: string): string {
 }
 
 /**
+ * The steps of a path: `items[3].contractor.name` is four of them.
+ *
+ * Split rather than compared as text, because the question asked of two paths
+ * is how much of one record they agree on — and `items[3]` shares eight
+ * characters with `items[30]` while sharing no step at all.
+ */
+export function segments(path: string): string[] {
+	const steps: string[] = [];
+	let step = "";
+
+	for (const character of path) {
+		if (character === ".") {
+			if (step) steps.push(step);
+			step = "";
+		} else if (character === "[") {
+			if (step) steps.push(step);
+			step = "[";
+		} else {
+			step += character;
+		}
+	}
+
+	if (step) steps.push(step);
+	return steps;
+}
+
+/** How many leading steps two paths share: how much of one record they are. */
+export function sharedSteps(
+	first: readonly string[],
+	second: readonly string[],
+): number {
+	let shared = 0;
+	while (
+		shared < first.length &&
+		shared < second.length &&
+		first[shared] === second[shared]
+	) {
+		shared++;
+	}
+	return shared;
+}
+
+/**
  * Whether `path` is `scope` itself or something inside it.
  *
  * Aware of where a segment ends, on purpose: a plain `startsWith` lets the

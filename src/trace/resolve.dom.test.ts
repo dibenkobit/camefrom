@@ -2,7 +2,8 @@ import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import { recordResponse, reset } from "../capture/store";
 import { taint } from "../capture/taint";
-import { resolve, textOf } from "./resolve";
+import { resolve } from "./resolve";
+import { textOf } from "./text";
 
 const window = new Window({ url: "http://localhost" });
 // happy-dom nodes are structurally what resolve() needs; it only ever touches
@@ -26,7 +27,7 @@ beforeEach(() => {
 	document.body.innerHTML = "";
 });
 
-function seed<T extends Record<string, unknown>>(body: T): T {
+function seed<T>(body: T): T {
 	const recorded = recordResponse(meta, body);
 	// Reading through the proxy is what registers the paths.
 	const tainted = taint(body, recorded.id);
@@ -166,6 +167,134 @@ describe("telling identical values apart", () => {
 		const row = { original: { ...((body.data as unknown[])[1] as object) } };
 
 		expect(resolve(cellHolding(row))?.path).toBe("data[1].full_name");
+	});
+});
+
+/**
+ * The shape that made the first version of this list four candidates long. A
+ * table that builds its cells inline — `rows.map(row => <Cell>{value(row)}</Cell>)`
+ * — keeps the record inside the parent's own render and hands everything below
+ * a finished string, so no fiber in the tree was ever given the row and there is
+ * nothing in the props to place. What is left is on screen: the rest of the row.
+ */
+describe("when the record never reaches the component", () => {
+	const sites = () => [
+		{ feName: "ALA0000", status: "Активен", region: "Астана" },
+		{ feName: "ALA0001", status: "Активен", region: "Алматинская область" },
+		{ feName: "ALA0002", status: "Активен", region: "Караганда" },
+		{ feName: "ALA0003", status: "Активен", region: "Алматинская область" },
+	];
+
+	/** The DOM such a table leaves: a row per record, a div per cell. */
+	function table(
+		rows: readonly Record<string, string | null>[],
+		columns: readonly string[],
+	): void {
+		const body = rows
+			.map(
+				(row) =>
+					`<tr>${columns
+						// A dash for a null, the way every table of this kind renders one.
+						.map((key) => `<td><div>${row[key] ?? "-"}</div></td>`)
+						.join("")}</tr>`,
+			)
+			.join("");
+		document.body.innerHTML = `<table><tbody>${body}</tbody></table>`;
+	}
+
+	/** The cell the pointer would land on: row `row`, column `column`. */
+	function cellIn(row: number, column: number): Node {
+		const cell = document
+			.querySelectorAll("tr")
+			[row]?.querySelectorAll("div")[column];
+		if (!cell) throw new Error("no such cell");
+		return cell;
+	}
+
+	test("tells the row by the rest of what that row shows", () => {
+		seed(sites());
+		table(sites(), ["feName", "status", "region"]);
+
+		// `ALA0003` was read from `[3]`, so the box holding both is `[3]` — while
+		// the status all four rows share fits every candidate and says nothing.
+		expect(resolve(cellIn(3, 2))?.path).toBe("[3].region");
+		expect(resolve(cellIn(1, 2))?.path).toBe("[1].region");
+	});
+
+	test("a column with nothing beside it is still every candidate", () => {
+		seed(sites());
+		table(sites(), ["region"]);
+
+		const found = resolve(cellIn(3, 0));
+		expect(found?.path).toBeUndefined();
+		expect(found?.ambiguous).toEqual(["[1].region", "[3].region"]);
+		expect(found?.hops[0]?.label).toBe("2 fields hold this value");
+	});
+
+	/**
+	 * The failure this is built to avoid, and the reason the search stops at the
+	 * row: an empty row and a filled one, where the whole table as evidence would
+	 * name the only row that had anything to say.
+	 */
+	test("the row that shows nothing is not answered with the row that does", () => {
+		const rows = [
+			{ feName: "", region: "Алматинская область" },
+			{ feName: "ALA0001", region: "Алматинская область" },
+		];
+		seed(rows);
+		table(rows, ["feName", "region"]);
+
+		expect(resolve(cellIn(0, 1))?.ambiguous).toEqual([
+			"[0].region",
+			"[1].region",
+		]);
+	});
+
+	/**
+	 * The row from the screenshot this was built for: a record whose every other
+	 * field is null shows nothing of its own to be recognised by. What is left is
+	 * that it sits between two rows that can be recognised, and only one candidate
+	 * fits between them.
+	 */
+	describe("a row of nulls, counted off against the rows around it", () => {
+		const sparse = () => [
+			{ feName: "ALA0000", region: "Астана" },
+			{ feName: "ALA0001", region: "Алматинская область" },
+			{ feName: null, region: "Алматинская область" },
+			{ feName: "ALA0003", region: "Караганда" },
+		];
+
+		test("is the one candidate that fits between them", () => {
+			seed(sparse());
+			table(sparse(), ["feName", "region"]);
+
+			expect(resolve(cellIn(2, 1))?.path).toBe("[2].region");
+		});
+
+		test("counts a list that runs the other way just as well", () => {
+			// Sorted in the browser: nothing here assumes the fifth row on screen is
+			// `[4]`, only that the rows either side of it place themselves.
+			seed(sparse());
+			table([...sparse()].reverse(), ["feName", "region"]);
+
+			expect(resolve(cellIn(1, 1))?.path).toBe("[2].region");
+		});
+
+		test("says nothing when two candidates fit between them", () => {
+			const rows = [
+				{ feName: "ALA0000", region: "Астана" },
+				{ feName: null, region: "Алматинская область" },
+				{ feName: null, region: "Алматинская область" },
+				{ feName: "ALA0003", region: "Караганда" },
+			];
+			seed(rows);
+			table(rows, ["feName", "region"]);
+
+			expect(resolve(cellIn(2, 1))?.ambiguous).toEqual([
+				"[1].region",
+				"[2].region",
+			]);
+		});
 	});
 });
 

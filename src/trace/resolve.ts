@@ -1,9 +1,11 @@
 import { findReads, findResponse } from "../capture/store";
 import { attributeOf, type Fiber, nearestFiber, treeOf } from "../react/fiber";
-import { ELEMENT_NODE, elementOf, TEXT_NODE } from "../shared/dom";
+import { elementOf } from "../shared/dom";
 import { joinPath, within } from "../shared/path";
 import type { Frame, Hop, Provenance } from "../shared/types";
 import { entriesOf, isRecordLike, pathsOf, place } from "./match";
+import { type Field, narrow } from "./surroundings";
+import { candidates, textOf } from "./text";
 
 /** How far up we look for the object a component was handed. */
 const MAX_FIBERS = 40;
@@ -11,37 +13,8 @@ const MAX_FIBERS = 40;
 const MAX_SCOPES = 64;
 const MAX_INSIDE = 32;
 
-/** The text a node shows itself, without sweeping up everything below it. */
-export function textOf(node: Node): string {
-	if (node.nodeType === TEXT_NODE) return (node as Text).data;
-	if (node.nodeType !== ELEMENT_NODE) return "";
-
-	let direct = "";
-	for (const child of Array.from(node.childNodes)) {
-		if (child.nodeType === TEXT_NODE) direct += (child as Text).data;
-	}
-	return direct.trim() === "" ? (node.textContent ?? "") : direct;
-}
-
-/**
- * What the text on screen might have been before it was rendered. A cell
- * showing `42` was a number in the response, not the string it is now.
- */
-function* candidates(text: string): Generator<unknown> {
-	const trimmed = text.trim();
-	yield trimmed;
-	if (trimmed !== text) yield text;
-	if (trimmed !== "") {
-		const asNumber = Number(trimmed);
-		if (Number.isFinite(asNumber)) yield asNumber;
-	}
-}
-
 /** One field of one response that holds the value. */
-interface Located {
-	responseId: number;
-	path: string;
-}
+type Located = Field;
 
 /** One field is one answer, however many recorded copies of it we hold. */
 function unique(located: readonly Located[]): Located[] {
@@ -114,15 +87,22 @@ function anywhere(value: unknown, scopes: readonly object[]): Located[] {
  * The data half of the answer: which response field holds this text.
  *
  * Pure on purpose — the join is the part that can be wrong, and it should be
- * exercisable without a browser.
+ * exercisable without a browser. `narrowed` is where the page gets its say, and
+ * it is only ever asked when the value alone left more than one candidate.
  */
 export function traceText(
 	text: string,
 	scopes: readonly object[] = [],
+	narrowed: (hits: readonly Located[]) => readonly Located[] = (hits) => hits,
 ): Provenance {
 	for (const candidate of candidates(text)) {
 		const near = locate(candidate, scopes);
-		const hits = near.length > 0 ? near : anywhere(candidate, scopes);
+		const found = near.length > 0 ? near : anywhere(candidate, scopes);
+		// The record itself is often nowhere near the component that rendered the
+		// text — a table that builds its cells inline from a `.map()` hands the
+		// components strings and keeps the row to itself. What that row shows in
+		// its other cells is on screen either way.
+		const hits = found.length > 1 ? narrowed(found) : found;
 		const first = hits[0];
 		if (!first) continue;
 
@@ -243,7 +223,9 @@ export function resolve(target: Node | null): Provenance | null {
 	if (text.trim() === "") return null;
 
 	const fiber = nearestFiber(target);
-	const provenance = traceText(text, scopesOf(fiber));
+	const provenance = traceText(text, scopesOf(fiber), (hits) =>
+		narrow(hits, target),
+	);
 	provenance.tree = positioned(treeOf(fiber), target);
 	return provenance;
 }
