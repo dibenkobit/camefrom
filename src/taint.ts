@@ -1,3 +1,4 @@
+import { childPath } from "./path";
 import { recordRead } from "./store";
 
 export interface Origin {
@@ -20,11 +21,6 @@ function isTaintable(value: unknown): value is object {
 	if (Array.isArray(value)) return true;
 	const prototype: unknown = Object.getPrototypeOf(value);
 	return prototype === Object.prototype || prototype === null;
-}
-
-function childPath(parent: string, key: string, isIndex: boolean): string {
-	if (isIndex) return `${parent}[${key}]`;
-	return parent ? `${parent}.${key}` : key;
 }
 
 /**

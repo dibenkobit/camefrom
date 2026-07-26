@@ -1,4 +1,4 @@
-import { print } from "./json";
+import { type PrintedJson, print } from "./json";
 import { type Excerpt, excerpt } from "./source";
 import type { Hop, Provenance } from "./types";
 
@@ -62,6 +62,9 @@ const STYLE = `
 .arrow { color: var(--dim); }
 .where { all: unset; color: var(--link); cursor: pointer; text-decoration: underline; }
 .broken { color: var(--warn); }
+.choices { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding-left: 14px; }
+.choice { all: unset; color: var(--link); cursor: pointer; }
+.choice:hover, .choice.on { background: var(--mark); color: var(--fg); }
 .code { border-top: 1px solid var(--edge); padding: 8px 0; overflow-x: auto; }
 .code:empty { display: none; }
 .line { display: flex; gap: 10px; padding: 0 12px; white-space: pre; }
@@ -80,9 +83,14 @@ const STYLE = `
 .hit { display: block; background: var(--mark); color: var(--fg); border-radius: 3px; }
 `;
 
+/** Candidate fields worth a row of their own before a count says more. */
+const MAX_CHOICES = 12;
+
 let shadow: ShadowRoot | undefined;
 /** Guards against a slow excerpt landing in a panel that has moved on. */
 let generation = 0;
+/** The panel shows one body at a time, and printing a large one is not free. */
+let printed: { source: unknown; json: PrintedJson } | undefined;
 
 function element<K extends keyof HTMLElementTagNameMap>(
 	tag: K,
@@ -130,7 +138,45 @@ function openInEditor(hop: Hop): void {
 	);
 }
 
-function chainOf(provenance: Provenance): HTMLElement {
+/**
+ * The candidates, when the field could not be narrowed to one.
+ *
+ * Listed rather than resolved, and each one selectable, because the developer
+ * looking at the row knows which of them it is and the tool does not.
+ */
+function choicesOf(
+	paths: string[],
+	onPick: (path: string) => void,
+): HTMLElement {
+	const choices = element("div", "choices");
+	const shown = paths.slice(0, MAX_CHOICES);
+
+	for (const path of shown) {
+		const choice = element("button", "choice", path);
+		choice.addEventListener("click", () => {
+			for (const other of Array.from(choices.children)) {
+				other.className = "choice";
+			}
+			choice.className = "choice on";
+			onPick(path);
+		});
+		choices.append(choice);
+	}
+
+	// Never trailing off silently: a truncated list that looks complete is how
+	// a developer concludes there were only twelve.
+	if (paths.length > shown.length) {
+		choices.append(
+			element("div", "arrow", `…${paths.length - shown.length} more`),
+		);
+	}
+	return choices;
+}
+
+function chainOf(
+	provenance: Provenance,
+	onPick: (path: string) => void,
+): HTMLElement {
 	const chain = element("div", "chain");
 
 	for (const hop of provenance.hops) {
@@ -150,6 +196,10 @@ function chainOf(provenance: Provenance): HTMLElement {
 			row.append(where);
 		}
 		chain.append(row);
+
+		if (hop.kind === "read" && provenance.ambiguous) {
+			chain.append(choicesOf(provenance.ambiguous, onPick));
+		}
 	}
 
 	if (provenance.broken) {
@@ -176,23 +226,29 @@ function codeOf(found: Excerpt): DocumentFragment {
 	return fragment;
 }
 
-function bodyOf(provenance: Provenance): HTMLElement | undefined {
-	if (provenance.response === undefined) return undefined;
+function printedOf(source: unknown): PrintedJson {
+	// Compared against `undefined` explicitly: `printed?.source === source` also
+	// holds when nothing has been printed and the body itself is undefined.
+	if (printed !== undefined && printed.source === source) return printed.json;
 
-	const printed = print(provenance.response);
-	const body = element("pre", "body");
-	const hit =
-		provenance.path === undefined
-			? undefined
-			: printed.lineOfPath.get(provenance.path);
+	const json = print(source);
+	printed = { source, json };
+	return json;
+}
+
+/** Writes the response into `body`, marked and scrolled to `path`. */
+function fillBody(body: HTMLElement, source: unknown, path?: string): void {
+	const json = printedOf(source);
+	const hit = path === undefined ? undefined : json.lineOfPath.get(path);
+	body.textContent = "";
 
 	if (hit === undefined) {
-		body.textContent = printed.text;
-		return body;
+		body.textContent = json.text;
+		return;
 	}
 
 	// Split around the matched line so it can be marked and scrolled to.
-	const lines = printed.text.split("\n");
+	const lines = json.text.split("\n");
 	const marked = element("mark", "hit", lines[hit] ?? "");
 	body.append(
 		document.createTextNode(`${lines.slice(0, hit).join("\n")}\n`),
@@ -203,7 +259,6 @@ function bodyOf(provenance: Provenance): HTMLElement | undefined {
 	requestAnimationFrame(() => {
 		marked.scrollIntoView({ block: "center" });
 	});
-	return body;
 }
 
 async function fillCode(
@@ -240,11 +295,19 @@ export function show(provenance: Provenance): void {
 	close.addEventListener("click", hide);
 	head.append(close);
 
+	const source = provenance.response;
+	const body = source === undefined ? undefined : element("pre", "body");
+	if (body) fillBody(body, source, provenance.path);
+
 	// Stays empty, and hidden by `.code:empty`, unless a dev server answers.
 	const code = element("div", "code");
-	panel.append(head, chainOf(provenance), code);
-
-	const body = bodyOf(provenance);
+	panel.append(
+		head,
+		chainOf(provenance, (path) => {
+			if (body) fillBody(body, source, path);
+		}),
+		code,
+	);
 	if (body) panel.append(body);
 
 	root.append(panel);

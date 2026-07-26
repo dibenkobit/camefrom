@@ -59,26 +59,96 @@ describe("telling identical values apart", () => {
 		],
 	});
 
-	test("uses the row object the component was handed", () => {
-		const body = seed(rows());
+	/** Two documents whose names are identical. The ids are the difference. */
+	const documents = () => ({
+		data: [
+			{ id: 59, full_name: "Alpyspayev Bakhtiyar" },
+			{ id: 60, full_name: "Alpyspayev Bakhtiyar" },
+		],
+	});
 
-		const cell = attachFiber(render("<div>Активен</div>"), {
+	/** A cell with the row object React handed the component around it. */
+	function cellHolding(row: unknown, text = "Alpyspayev Bakhtiyar"): Element {
+		return attachFiber(render(`<div>${text}</div>`), {
 			type: "div",
 			return: {
-				type: function WorkRow() {},
-				// React hands the row down as a prop, and that object still
-				// knows which row it is.
-				memoizedProps: { row: body.items[2] },
+				type: function DocumentRow() {},
+				memoizedProps: { row },
 				return: null,
 			},
 		});
+	}
 
-		expect(resolve(cell)?.path).toBe("items[2].status");
+	test("uses the row object the component was handed", () => {
+		const body = seed(rows());
+		expect(resolve(cellHolding(body.items[2], "Активен"))?.path).toBe(
+			"items[2].status",
+		);
 	});
 
-	test("falls back to the first match when nothing narrows it down", () => {
+	/**
+	 * The tool was wrong here for as long as it required the proxy itself, and
+	 * it was wrong in the way that costs most: confidently, always naming the
+	 * first row. Every shape below is one an ordinary app produces.
+	 */
+	describe("after the row was copied on its way down", () => {
+		const copies: Array<[string, (rows: unknown[]) => unknown[]]> = [
+			["spread", (all) => all.map((row) => ({ ...(row as object) }))],
+			[
+				"frozen by immer or Redux Toolkit",
+				(all) => all.map((row) => Object.freeze({ ...(row as object) })),
+			],
+			[
+				"narrowed by a query select",
+				(all) =>
+					all.map((row) => {
+						const { id, full_name } = row as {
+							id: number;
+							full_name: string;
+						};
+						return { id, full_name };
+					}),
+			],
+			[
+				"remapped to another shape",
+				(all) =>
+					all.map((row) => {
+						const source = row as { id: number; full_name: string };
+						return { id: source.id, label: source.full_name };
+					}),
+			],
+		];
+
+		for (const [shape, copy] of copies) {
+			test(`still names the right row when ${shape}`, () => {
+				const body = seed(documents());
+				const handed = copy(body.data as unknown[]);
+
+				expect(resolve(cellHolding(handed[0]))?.path).toBe("data[0].full_name");
+				expect(resolve(cellHolding(handed[1]))?.path).toBe("data[1].full_name");
+			});
+		}
+	});
+
+	test("names every candidate when nothing narrows it down", () => {
 		seed(rows());
-		expect(resolve(render("<div>Активен</div>"))?.path).toBe("items[0].status");
+
+		const found = resolve(render("<div>Активен</div>"));
+		expect(found?.path).toBeUndefined();
+		expect(found?.ambiguous).toEqual([
+			"items[0].status",
+			"items[1].status",
+			"items[2].status",
+		]);
+		expect(found?.hops[0]?.label).toBe("3 fields hold this value");
+	});
+
+	test("reaches the record through a wrapper a table library added", () => {
+		const body = seed(documents());
+		// What a TanStack Table cell is handed: the record is on `.original`.
+		const row = { original: { ...((body.data as unknown[])[1] as object) } };
+
+		expect(resolve(cellHolding(row))?.path).toBe("data[1].full_name");
 	});
 });
 

@@ -21,6 +21,18 @@ const responses: RecordedResponse[] = [];
 const readsByValue = new Map<unknown, RecordedRead[]>();
 
 let nextId = 1;
+let revisionCount = 0;
+
+/**
+ * Bumped whenever what we know changes.
+ *
+ * Callers cache answers derived from the store; a request that lands between
+ * two hovers has to invalidate them, or the panel keeps repeating a conclusion
+ * that was only true a moment ago.
+ */
+export function revision(): number {
+	return revisionCount;
+}
 
 export function recordResponse(
 	meta: RequestMeta,
@@ -29,11 +41,22 @@ export function recordResponse(
 	const response: RecordedResponse = { ...meta, id: nextId++, body };
 	responses.push(response);
 	if (responses.length > MAX_RESPONSES) responses.shift();
+	revisionCount++;
 	return response;
 }
 
 export function findResponse(id: number): RecordedResponse | undefined {
 	return responses.find((response) => response.id === id);
+}
+
+/**
+ * Everything still kept, newest first.
+ *
+ * Newest first because a value that appears in a stale response and in the one
+ * that just arrived came from the one that just arrived.
+ */
+export function recorded(): readonly RecordedResponse[] {
+	return responses.slice().reverse();
 }
 
 /**
@@ -73,4 +96,5 @@ export function reset(): void {
 	responses.length = 0;
 	readsByValue.clear();
 	nextId = 1;
+	revisionCount++;
 }

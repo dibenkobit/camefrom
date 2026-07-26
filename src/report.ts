@@ -1,5 +1,8 @@
 import type { Provenance } from "./types";
 
+/** Candidates worth reading one by one before a count says more. */
+const MAX_LISTED = 6;
+
 /** How the value itself is announced. Strings keep their quotes. */
 function title(value: unknown): string {
 	return typeof value === "string" ? `"${value}"` : String(value);
@@ -16,6 +19,17 @@ export function format(provenance: Provenance): string[] {
 			: undefined;
 		return where ? `← ${hop.label} · ${where}` : `← ${hop.label}`;
 	});
+
+	// Which of them it is cannot be told apart from here, so all of them are
+	// named. A single confident line would be the more useful shape and the
+	// wrong one.
+	if (provenance.ambiguous) {
+		for (const path of provenance.ambiguous.slice(0, MAX_LISTED)) {
+			lines.push(`  ? ${path}`);
+		}
+		const rest = provenance.ambiguous.length - MAX_LISTED;
+		if (rest > 0) lines.push(`  ? …${rest} more`);
+	}
 
 	if (provenance.broken) {
 		// The honest ending. A tool that guesses confidently is worse than no

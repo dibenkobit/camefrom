@@ -84,10 +84,19 @@ camefrom "1 250,00 ₸"
 ```
 
 A tool that answers confidently and wrongly is worse than no tool. The same
-reasoning decides which row you clicked: in a table of five hundred identical
-statuses the text alone is ambiguous, so the row object React handed the
-component breaks the tie, because that object still remembers where in the body
-it came from.
+reasoning decides which row you clicked. In a table of five hundred identical
+statuses the text alone cannot say, so the answer comes from the record React
+handed the component: which field of it equals the text, and where that record
+sits in the body — placed by the fields it kept, so `{ ...row }`, an immer
+draft or a `select` that renamed half of them still lands on the right row.
+When even that leaves two candidates, you get both of them, not the first:
+
+```
+camefrom "Alpyspayev Bakhtiyar"
+  ← 2 fields hold this value
+      ? data[0].full_name
+      ? data[1].full_name
+```
 
 ## Works with
 
