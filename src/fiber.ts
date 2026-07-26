@@ -198,18 +198,40 @@ export function treeOf(fiber: Fiber | undefined): Frame[] {
 }
 
 /**
- * The innermost frame that knows where it is: the closest line to the value.
+ * Whether a position names a file the project installed rather than wrote.
+ *
+ * The path as the browser loaded it, which is why this can be asked before any
+ * source map has been fetched — and answers the same afterwards, since a
+ * dependency's map names sources inside the dependency.
+ */
+function installed(at: Position): boolean {
+	return at.file.includes("/node_modules/");
+}
+
+/**
+ * The innermost frame that knows where it is, in code the project wrote.
  *
  * The frame itself rather than its position, because it is often not the frame
  * that was pointed at — React stops recording positions after ten thousand
  * elements — and an excerpt from someone else's component has to say whose it
  * is. Presenting it as the line that rendered the text is how a closing brace
  * comes to look like the answer.
+ *
+ * A dependency's own line is stepped over rather than taken. React Router
+ * writes the `<a>` behind every `<Link>`, MUI writes the `<button>`: the most
+ * precise line there is belongs to a file nobody here can edit, and offering it
+ * answers a question no one asked. The innermost of them is kept as the
+ * fallback, because a line inside a library still beats an empty box — and the
+ * excerpt says which file it is from either way.
  */
 export function innermost(tree: readonly Frame[]): Frame | undefined {
+	let dependency: Frame | undefined;
+
 	for (let index = tree.length - 1; index >= 0; index--) {
 		const frame = tree[index];
-		if (frame?.at && frame.at.line > 0) return frame;
+		if (!frame?.at || frame.at.line <= 0) continue;
+		if (!installed(frame.at)) return frame;
+		dependency ??= frame;
 	}
-	return undefined;
+	return dependency;
 }
