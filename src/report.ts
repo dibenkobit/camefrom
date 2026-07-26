@@ -3,8 +3,13 @@ import type { Frame, Provenance } from "./types";
 /** Candidates worth reading one by one before a count says more. */
 const MAX_LISTED = 6;
 
-/** How the value itself is announced. Strings keep their quotes. */
-function title(value: unknown): string {
+/**
+ * How the value itself is announced. Strings keep their quotes.
+ *
+ * Exported so the panel and the clipboard say it the same way. Three copies of
+ * one sentence drift, and the one on the clipboard ends up in a ticket.
+ */
+export function title(value: unknown): string {
 	return typeof value === "string" ? `"${value}"` : String(value);
 }
 

@@ -1,10 +1,12 @@
 import { intercept } from "./intercept";
-import { show } from "./panel";
+import { type Point, show } from "./panel";
 import { report } from "./report";
 import { resolve } from "./resolve";
 import type { Provenance } from "./types";
 
-export type { Hop, Provenance, RequestMeta } from "./types";
+export type { Frame, Hop, Position, Provenance, RequestMeta } from "./types";
+
+const ELEMENT_NODE = 1;
 
 let installed = false;
 
@@ -28,6 +30,25 @@ function nodeAt(event: MouseEvent): Node | null {
 	return event.target as Node | null;
 }
 
+/**
+ * Where to open the panel for a node nobody clicked.
+ *
+ * `camefrom($0)` has no pointer to work from, so the element's own box is the
+ * next best anchor — under its bottom-left corner, the way a tooltip sits. A
+ * node with no box, detached or hidden, measures zero on every side, and then
+ * the panel is better off in its corner than at the top of the page.
+ */
+function anchorOf(target: Node): Point | undefined {
+	const element =
+		target.nodeType === ELEMENT_NODE
+			? (target as Element)
+			: target.parentElement;
+
+	const box = element?.getBoundingClientRect();
+	if (!box || (box.width === 0 && box.height === 0)) return undefined;
+	return { x: box.left, y: box.bottom };
+}
+
 function listen(): void {
 	if (typeof document === "undefined") return;
 
@@ -48,7 +69,9 @@ function listen(): void {
 			// nothing should still behave like an ordinary click.
 			event.preventDefault();
 			event.stopPropagation();
-			show(found);
+			// Beside the click: the answer belongs next to the thing asked about,
+			// not in the corner where the panel used to cover the next cell.
+			show(found, { x: event.clientX, y: event.clientY });
 			report(found);
 		},
 		// Captured, so an app that swallows clicks cannot swallow this one.
@@ -80,12 +103,18 @@ export function install(): void {
 /**
  * Answer "where did this come from?" for a node in the page.
  *
+ * Opens the panel beside the node as well as returning the answer: the object
+ * is what the console prints, but the chain, the source line and the response
+ * body are only readable in the panel.
+ *
  * Returns `null` when the node carries no text — callers should treat that as
  * "nothing to say", never as an error. A node whose text was never read out of
  * a response comes back with `broken: true` instead.
  */
 export function camefrom(target: Node | null): Provenance | null {
-	return resolve(target);
+	const found = resolve(target);
+	if (found && target) show(found, anchorOf(target));
+	return found;
 }
 
 declare global {

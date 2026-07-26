@@ -1,5 +1,6 @@
 import { innermost } from "./fiber";
 import { type PrintedJson, print } from "./json";
+import { format, title } from "./report";
 import { type Excerpt, excerpt } from "./source";
 import type { Frame, Position, Provenance } from "./types";
 
@@ -48,16 +49,23 @@ const STYLE = `
     gap: 8px;
     padding: 10px 12px;
     border-bottom: 1px solid var(--edge);
+    cursor: grab;
+    /* A drag by the header must not become a text selection, nor — on a touch
+       screen — a scroll, which is what would swallow the pointermoves. */
+    user-select: none;
+    touch-action: none;
 }
+.head.dragging { cursor: grabbing; }
 .value { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
-.close {
+.act {
     all: unset;
     padding: 0 4px;
     color: var(--dim);
     cursor: pointer;
     line-height: 1;
+    white-space: nowrap;
 }
-.close:hover { color: var(--fg); }
+.act:hover { color: var(--fg); }
 .chain { padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; }
 .hop { display: flex; gap: 6px; }
 .arrow { color: var(--dim); }
@@ -91,6 +99,21 @@ const STYLE = `
 
 /** Candidate fields worth a row of their own before a count says more. */
 const MAX_CHOICES = 12;
+/** How far the panel keeps clear of the point it was opened at. */
+const GAP = 14;
+/**
+ * How close the panel may come to the edge of the viewport. The same inset the
+ * stylesheet parks it at, and the one its `max-width` already reserves.
+ */
+const EDGE = 16;
+/** The copy button at rest, restored once it has said how the copy went. */
+const COPY = "copy";
+
+/** A point in viewport coordinates — where the pointer was, in practice. */
+export interface Point {
+	x: number;
+	y: number;
+}
 
 let shadow: ShadowRoot | undefined;
 /** Guards against a slow excerpt landing in a panel that has moved on. */
@@ -130,6 +153,164 @@ function mount(): ShadowRoot {
 /** How an editor is told where to go. A line of 0 means we only know the file. */
 function target(at: Position): string {
 	return at.line > 0 ? `${at.file}:${at.line}:${at.column}` : at.file;
+}
+
+/**
+ * One axis clamped to the viewport.
+ *
+ * A panel bigger than the viewport pins its near edge instead: losing the tail
+ * of a long response body beats losing the header the whole panel is read from.
+ *
+ * Exported, with `beside`, because this arithmetic is the part that can be
+ * wrong and a headless DOM has no layout to catch it through.
+ */
+export function within(start: number, size: number, view: number): number {
+	return Math.max(EDGE, Math.min(start, view - size - EDGE));
+}
+
+/** Where a box of `size` starts on one axis so that it sits beside `point`. */
+export function beside(point: number, size: number, view: number): number {
+	const after = point + GAP;
+	// Flip to the near side of the point rather than overflow, which is what
+	// keeps a click near the right or the bottom edge readable.
+	const start = after + size + EDGE <= view ? after : point - GAP - size;
+	return within(start, size, view);
+}
+
+/** The box a `position: fixed` panel lives in, scrollbars excluded. */
+function viewport(): { width: number; height: number } {
+	const root = document.documentElement;
+	return { width: root.clientWidth, height: root.clientHeight };
+}
+
+function moveTo(panel: HTMLElement, left: number, top: number): void {
+	// Whole pixels: a fraction blurs monospace text on a non-retina screen.
+	panel.style.left = `${Math.round(left)}px`;
+	panel.style.top = `${Math.round(top)}px`;
+	// The stylesheet parks the panel in the bottom-right corner. Once it is
+	// placed by hand those two have to let go, or the box is over-constrained.
+	panel.style.right = "auto";
+	panel.style.bottom = "auto";
+}
+
+/**
+ * Put the panel beside the point that opened it.
+ *
+ * Measured after appending rather than assumed: `max-height` is a share of the
+ * viewport, so the real height depends on how much response body there is.
+ */
+function placeBeside(panel: HTMLElement, at: Point): void {
+	const size = panel.getBoundingClientRect();
+	const view = viewport();
+	moveTo(
+		panel,
+		beside(at.x, size.width, view.width),
+		beside(at.y, size.height, view.height),
+	);
+}
+
+/** Pull a placed panel back inside the viewport after it changed size. */
+function keepInside(panel: HTMLElement): void {
+	const size = panel.getBoundingClientRect();
+	const view = viewport();
+	moveTo(
+		panel,
+		within(size.left, size.width, view.width),
+		within(size.top, size.height, view.height),
+	);
+}
+
+/**
+ * Drag the panel by its header.
+ *
+ * Pointer capture, not a listener on the document: the pointer keeps reporting
+ * to the header even over an iframe or a canvas, or outside the window, all of
+ * which cut a document-level drag off halfway.
+ */
+function draggable(panel: HTMLElement, head: HTMLElement): void {
+	head.addEventListener("pointerdown", (event) => {
+		// The buttons in the header are not somewhere to grab the panel by.
+		if (
+			event.button !== 0 ||
+			(event.target as Element | null)?.closest("button")
+		)
+			return;
+
+		// Held, not accumulated: when the panel stops at an edge and the pointer
+		// runs on, this is what lets it pick up exactly where it was let go.
+		const start = panel.getBoundingClientRect();
+		const holdX = event.clientX - start.left;
+		const holdY = event.clientY - start.top;
+
+		const drag = (moved: PointerEvent): void => {
+			const size = panel.getBoundingClientRect();
+			const view = viewport();
+			moveTo(
+				panel,
+				within(moved.clientX - holdX, size.width, view.width),
+				within(moved.clientY - holdY, size.height, view.height),
+			);
+		};
+
+		const drop = (): void => {
+			head.classList.remove("dragging");
+			head.removeEventListener("pointermove", drag);
+			head.removeEventListener("pointerup", drop);
+			head.removeEventListener("pointercancel", drop);
+		};
+
+		head.setPointerCapture(event.pointerId);
+		head.classList.add("dragging");
+		head.addEventListener("pointermove", drag);
+		head.addEventListener("pointerup", drop);
+		head.addEventListener("pointercancel", drop);
+		// Without this the header text starts a selection instead of a drag.
+		event.preventDefault();
+	});
+}
+
+/** The chain as something to paste into a ticket or a chat. */
+function asText(provenance: Provenance): string {
+	const lines = [`camefrom ${title(provenance.value)}`, ...format(provenance)];
+	// The chain says which field; the request line is what the colleague on the
+	// other end of the ticket needs to fetch it themselves.
+	if (provenance.request) {
+		lines.push(
+			`request: ${provenance.request.method} ${provenance.request.url}`,
+		);
+	}
+	return lines.join("\n");
+}
+
+/** Say the outcome in the button, then go back to being a copy button. */
+function says(button: HTMLElement, word: string): void {
+	button.textContent = word;
+	setTimeout(() => {
+		button.textContent = COPY;
+	}, 1000);
+}
+
+/**
+ * Put the chain on the clipboard, and say where it went.
+ *
+ * `navigator.clipboard` is missing on a plain http origin in Chrome and Safari,
+ * and rejects when the document is not focused, so the console keeps a copy
+ * either way: a copy button that quietly does nothing is worse than no button.
+ */
+async function toClipboard(
+	provenance: Provenance,
+	button: HTMLElement,
+): Promise<void> {
+	const text = asText(provenance);
+	try {
+		await navigator.clipboard.writeText(text);
+		says(button, "copied");
+	} catch (error) {
+		console.log(
+			`camefrom: no clipboard here (${String(error)}). The chain, to copy by hand:\n${text}`,
+		);
+		says(button, "see console");
+	}
 }
 
 /** Asks the dev server to open an editor. Vite answers; anything else will not. */
@@ -302,7 +483,14 @@ async function fillCode(
 	code.append(codeOf(found));
 }
 
-export function show(provenance: Provenance): void {
+/**
+ * Show the chain, beside `at` when the caller knows where the click landed.
+ *
+ * Without a point the panel keeps the stylesheet's corner: better a known place
+ * than a guessed one. Each call places the panel afresh, so a panel dragged out
+ * of the way stays where it was put only for as long as it is that panel.
+ */
+export function show(provenance: Provenance, at?: Point): void {
 	const root = mount();
 	root.querySelector(".panel")?.remove();
 	const mine = ++generation;
@@ -310,15 +498,16 @@ export function show(provenance: Provenance): void {
 	const panel = element("div", "panel");
 
 	const head = element("div", "head");
-	const value =
-		typeof provenance.value === "string"
-			? `"${provenance.value}"`
-			: String(provenance.value);
-	head.append(element("div", "value", value));
+	head.append(element("div", "value", title(provenance.value)));
 
-	const close = element("button", "close", "✕");
+	const copy = element("button", "act copy", COPY);
+	copy.addEventListener("click", () => {
+		void toClipboard(provenance, copy);
+	});
+
+	const close = element("button", "act close", "✕");
 	close.addEventListener("click", hide);
-	head.append(close);
+	head.append(copy, close);
 
 	const source = provenance.response;
 	const body = source === undefined ? undefined : element("pre", "body");
@@ -337,7 +526,14 @@ export function show(provenance: Provenance): void {
 	if (body) panel.append(body);
 
 	root.append(panel);
-	void fillCode(code, provenance, mine);
+	draggable(panel, head);
+	if (at) placeBeside(panel, at);
+
+	void fillCode(code, provenance, mine).then(() => {
+		// The excerpt arrives after the panel was placed and makes it taller;
+		// without this a panel opened low on the page would grow off the bottom.
+		if (at && mine === generation) keepInside(panel);
+	});
 }
 
 export function hide(): void {

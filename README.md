@@ -58,9 +58,12 @@ client. In production builds the package resolves to a no-op through the
 
 ## Use
 
-**Alt-click** any text in the page.
+**Alt-click** any text in the page. The panel opens beside the click, not in a
+corner on top of the next thing you wanted to read. Drag it by its header,
+**copy** puts the chain on the clipboard for a ticket, Escape closes it.
 
-Or from the console, on whatever is selected in the elements panel:
+Or from the console, on whatever is selected in the elements panel — which
+opens the panel beside that element as well as returning the answer:
 
 ```js
 camefrom($0);
