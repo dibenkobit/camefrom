@@ -24,7 +24,10 @@ const STYLE = `
     color: var(--fg);
     box-shadow: 0 12px 32px rgb(0 0 0 / 0.28);
     font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
-    overflow: hidden;
+    /* Clipped rather than hidden: overflow hidden is a scroll container, and one
+       scrollIntoView in the body would scroll the header off the top of a panel
+       that has no scrollbar to bring it back. */
+    overflow: clip;
 
     --bg: #ffffff;
     --fg: #1a1a1a;
@@ -45,6 +48,22 @@ const STYLE = `
         --mark: #3b3520;
     }
 }
+/*
+ * How the height is divided between the five sections below.
+ *
+ * Left to the flex defaults the tallest section wins twice over: what does not
+ * fit is taken off each of them in proportion to how tall it asked to be, so a
+ * response body of ten thousand lines squeezes the tree and the excerpt above
+ * it into a couple of pixels each — the middle of the panel neither readable
+ * nor scrollable, which is what this used to do.
+ *
+ * So every section above the body keeps its rows and gives none of them back.
+ * Each has a cap it scrolls past — three lines of value, six of chain, seven of
+ * tree, seven of excerpt — and the body lives on what is left of the panel,
+ * down to a floor of five lines of its own. All five full, borders and padding
+ * included, come to 608 of the 620 pixels the panel can be. The vh half of
+ * every cap holds the same division on a screen too short for that.
+ */
 .head {
     display: flex;
     align-items: baseline;
@@ -58,7 +77,13 @@ const STYLE = `
     touch-action: none;
 }
 .head.dragging { cursor: grabbing; }
-.value { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
+.value {
+    flex: 1;
+    max-height: min(6vh, 56px);
+    font-weight: 600;
+    overflow: auto;
+    overflow-wrap: anywhere;
+}
 .act {
     all: unset;
     padding: 0 4px;
@@ -68,7 +93,15 @@ const STYLE = `
     white-space: nowrap;
 }
 .act:hover { color: var(--fg); }
-.chain { padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; }
+.chain {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 2px;
+    max-height: min(12vh, 112px);
+    padding: 8px 12px;
+    overflow: auto;
+}
 .hop { display: flex; gap: 6px; }
 .arrow { color: var(--dim); }
 .where { all: unset; color: var(--link); cursor: pointer; text-decoration: underline; }
@@ -76,20 +109,22 @@ const STYLE = `
 .choices { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding-left: 14px; }
 .choice { all: unset; color: var(--link); cursor: pointer; }
 .choice:hover, .choice.on { background: var(--mark); color: var(--fg); }
-.tree { border-top: 1px solid var(--edge); padding: 8px 12px; overflow-x: auto; }
+.tree {
+    flex: none;
+    max-height: min(14vh, 130px);
+    padding: 8px 12px;
+    border-top: 1px solid var(--edge);
+    overflow: auto;
+}
 .tree:empty { display: none; }
 .frame { display: flex; gap: 8px; }
 .name { color: var(--dim); white-space: pre; }
 .frame.on .name { color: var(--fg); font-weight: 600; }
 .code {
-    border-top: 1px solid var(--edge);
+    flex: none;
+    max-height: min(14vh, 130px);
     padding: 8px 0;
-    min-height: 0;
-    /* A share of the panel the excerpt cannot exceed, and its own scroll within
-       it. Sections here shrink in proportion to how tall they want to be, so a
-       forty-line excerpt left uncapped squeezes the tree above it down to a row
-       or two — and the tree is what the panel is read for. */
-    max-height: min(40vh, 320px);
+    border-top: 1px solid var(--edge);
     overflow: auto;
 }
 .code:empty { display: none; }
@@ -109,8 +144,11 @@ const STYLE = `
 .num { min-width: 2.5em; text-align: right; color: var(--dim); user-select: none; }
 .rest { padding: 2px 12px 0; color: var(--dim); }
 .body {
-    flex: 1;
-    min-height: 0;
+    /* Sized to its content like every other section, rather than to a basis of
+       zero: a section that starts at nothing is a section that never shrinks,
+       and the rest of the panel ends up paying for the whole response. */
+    flex: 1 1 auto;
+    min-height: min(10vh, 92px);
     margin: 0;
     /* No padding across: the rows carry their own, so a marked line fills the
        box edge to edge instead of stopping short of it. */
@@ -482,6 +520,9 @@ function reasonFor(frame: Frame, into: HTMLElement): HTMLElement {
 	why.addEventListener("click", () => {
 		stack.hidden = !stack.hidden;
 		say();
+		// The tree it lands in is only seven rows tall, and a stack revealed
+		// below the fold of one is a button that did nothing.
+		if (!stack.hidden) stack.scrollIntoView({ block: "nearest" });
 	});
 	say();
 	return why;
@@ -670,6 +711,10 @@ export function show(provenance: Provenance, at?: Point): void {
 	if (body) panel.append(body);
 
 	root.append(panel);
+	// A tree taller than its seven rows opens on the outermost frames — the
+	// router and the providers, which is nobody's question. The row that was
+	// pointed at is the innermost, and the frames worth reading are around it.
+	panel.querySelector(".frame.on")?.scrollIntoView({ block: "nearest" });
 	draggable(panel, head);
 	if (at) placeBeside(panel, at);
 
