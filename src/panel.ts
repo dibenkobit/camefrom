@@ -86,6 +86,11 @@ const STYLE = `
 .note { padding-top: 4px; color: var(--warn); overflow-wrap: anywhere; }
 .why { color: var(--warn); opacity: 0.85; }
 .why.link { all: unset; color: var(--warn); cursor: pointer; text-decoration: underline; }
+/* Rows are only ever as wide as the box that scrolls them, which cuts every
+   mark off where the viewport happens to end. Sized to the longest line here
+   instead, so the rows inside can stretch to it and the mark ends up a block
+   rather than a ragged edge. */
+.rows { width: max-content; min-width: 100%; }
 .line { display: flex; gap: 10px; padding: 0 12px; white-space: pre; }
 .line.on { background: var(--mark); color: var(--fg); }
 .num { min-width: 2.5em; text-align: right; color: var(--dim); user-select: none; }
@@ -502,20 +507,21 @@ function treeView(frames: readonly Frame[]): HTMLElement {
 	return tree;
 }
 
-function codeOf(found: Excerpt): DocumentFragment {
-	const fragment = document.createDocumentFragment();
+function codeOf(found: Excerpt): HTMLElement {
+	const rows = element("div", "rows");
 
 	found.lines.forEach((text, index) => {
 		const number = found.first + index;
-		const row = element("div", number === found.target ? "line on" : "line");
+		const marked = number >= found.target.from && number <= found.target.to;
+		const row = element("div", marked ? "line on" : "line");
 		row.append(
 			element("span", "num", String(number)),
 			element("span", undefined, text),
 		);
-		fragment.append(row);
+		rows.append(row);
 	});
 
-	return fragment;
+	return rows;
 }
 
 function printedOf(source: unknown): PrintedJson {
@@ -539,14 +545,17 @@ function fillBody(body: HTMLElement, source: unknown, path?: string): void {
 		return;
 	}
 
-	// Split around the matched line so it can be marked and scrolled to.
+	// Split around the matched line so it can be marked and scrolled to. The
+	// wrapper is what gives the mark a width to fill, as in the excerpt.
 	const lines = json.text.split("\n");
 	const marked = element("mark", "hit", lines[hit] ?? "");
-	body.append(
+	const rows = element("div", "rows");
+	rows.append(
 		document.createTextNode(`${lines.slice(0, hit).join("\n")}\n`),
 		marked,
 		document.createTextNode(`\n${lines.slice(hit + 1).join("\n")}`),
 	);
+	body.append(rows);
 
 	requestAnimationFrame(() => {
 		marked.scrollIntoView({ block: "center" });
