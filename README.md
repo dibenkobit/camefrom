@@ -16,11 +16,15 @@ Alt-click it instead, and a panel answers:
 ┌ "ТОО Барыс"                                    ✕ ┐
 │ ← items[37].contractor.name                      │
 │ ← GET /api/works?status=active · 200 · 143ms     │
-│ ← <WorkRow>  src/works.table-columns.tsx:41      │
+│ ← rendered by                                    │
+│     <WorksPage>    src/works.page.tsx:18         │
+│       <WorksTable> src/works.tsx:64              │
+│         <WorkRow>  src/works.table-columns.tsx:41│
+│           <td>     src/works.row.tsx:12          │  ← highlighted
 ├──────────────────────────────────────────────────┤
-│  40   return (                                   │
-│  41     <td>{formatContractor(contractor)}</td>  │  ← highlighted
-│  42   )                                          │
+│  11   return (                                   │
+│  12     <td>{formatContractor(contractor)}</td>  │  ← highlighted
+│  13   )                                          │
 ├──────────────────────────────────────────────────┤
 │  "contractor": {                                 │
 │     "name": "ТОО Барыс"                          │  ← highlighted, scrolled to
@@ -28,10 +32,12 @@ Alt-click it instead, and a panel answers:
 └──────────────────────────────────────────────────┘
 ```
 
-Three things at once: the chain, the source around the line that rendered it,
-and the response body scrolled to the exact field. Clicking the file opens your
-editor there. Escape closes the panel. The same chain also goes to the console,
-where the body is logged as a real object for the inspector to browse.
+Four things at once: the chain, the whole tree that rendered it, the source
+around the line, and the response body scrolled to the exact field. Every frame
+of the tree is a link — the answer you want is often not the innermost
+component but the column definition two frames out. Escape closes the panel.
+The same chain also goes to the console, where the body is logged as a real
+object for the inspector to browse.
 
 The Network tab does not come into it.
 
@@ -63,10 +69,12 @@ camefrom($0);
 ```ts
 interface Provenance {
 	value: unknown; // 42, not "42", if that is what the response held
-	path?: string; // items[37].contractor.name
+	path?: string; // items[37].contractor.name — only when it is the only one
+	ambiguous?: string[]; // every candidate, when it is not
 	request?: RequestMeta; // method, url, status, duration
 	response?: unknown; // the recorded body, ready to inspect
 	hops: Hop[]; // the chain, nearest step first
+	tree: Frame[]; // who rendered it, outermost first, with file and line
 	broken: boolean; // honest when the trail runs out
 }
 ```
@@ -106,14 +114,20 @@ touches `fetch` in a browser. It also parses bodies itself, so `JSON.parse` is
 watched too.
 
 Any bundler — Vite, Next.js, webpack, Rspack — because the runtime needs no
-build step. If a source inspector such as
+build step. The render tree and its file and line numbers come from React
+itself: React 19 captures the call site of every element it creates, and
+React 16 to 18 carry whatever the Babel transform recorded. No plugin to
+install. If a source inspector such as
 [TanStack Devtools](https://tanstack.com/devtools) is already in the project,
-its `data-tsd-source` attributes are picked up for exact file and line numbers.
+its `data-tsd-source` attributes fill in anything React left out.
 
 ## Not yet
 
 - Intermediate transforms are not named — the chain jumps from the read to the
-  component.
+  component that rendered it.
+- A frame can come back without a position. An engine is free to inline a
+  function whose whole body is a `return` out of the stack, and React's own
+  owner stacks have the same gap. The frame is still listed, without a link.
 - The source excerpt needs a dev server that answers `?raw`, which today means
   Vite. Elsewhere the panel simply leaves that part out.
 - `XMLHttpRequest` with `responseType: "json"` is invisible: the browser parses

@@ -1,6 +1,7 @@
+import { innermost } from "./fiber";
 import { type PrintedJson, print } from "./json";
 import { type Excerpt, excerpt } from "./source";
-import type { Hop, Provenance } from "./types";
+import type { Frame, Position, Provenance } from "./types";
 
 const STYLE = `
 :host { all: initial; }
@@ -65,6 +66,11 @@ const STYLE = `
 .choices { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding-left: 14px; }
 .choice { all: unset; color: var(--link); cursor: pointer; }
 .choice:hover, .choice.on { background: var(--mark); color: var(--fg); }
+.tree { border-top: 1px solid var(--edge); padding: 8px 12px; overflow-x: auto; }
+.tree:empty { display: none; }
+.frame { display: flex; gap: 8px; }
+.name { color: var(--dim); white-space: pre; }
+.frame.on .name { color: var(--fg); font-weight: 600; }
 .code { border-top: 1px solid var(--edge); padding: 8px 0; overflow-x: auto; }
 .code:empty { display: none; }
 .line { display: flex; gap: 10px; padding: 0 12px; white-space: pre; }
@@ -121,18 +127,18 @@ function mount(): ShadowRoot {
 	return shadow;
 }
 
-function at(hop: Hop): string {
-	return [hop.file, hop.line, hop.column]
-		.filter((part) => part !== undefined)
-		.join(":");
+/** How an editor is told where to go. A line of 0 means we only know the file. */
+function target(at: Position): string {
+	return at.line > 0 ? `${at.file}:${at.line}:${at.column}` : at.file;
 }
 
 /** Asks the dev server to open an editor. Vite answers; anything else will not. */
-function openInEditor(hop: Hop): void {
-	void fetch(`/__open-in-editor?file=${encodeURIComponent(at(hop))}`).catch(
+function openInEditor(at: Position): void {
+	const where = target(at);
+	void fetch(`/__open-in-editor?file=${encodeURIComponent(where)}`).catch(
 		() => {
 			console.log(
-				`camefrom: could not open ${at(hop)}; is this a Vite dev server?`,
+				`camefrom: could not open ${where}; is this a Vite dev server?`,
 			);
 		},
 	);
@@ -185,16 +191,6 @@ function chainOf(
 			element("span", "arrow", "←"),
 			element("span", undefined, hop.label),
 		);
-
-		if (hop.file) {
-			const where = element(
-				"button",
-				"where",
-				hop.line ? `${hop.file}:${hop.line}` : hop.file,
-			);
-			where.addEventListener("click", () => openInEditor(hop));
-			row.append(where);
-		}
 		chain.append(row);
 
 		if (hop.kind === "read" && provenance.ambiguous) {
@@ -208,6 +204,36 @@ function chainOf(
 		);
 	}
 	return chain;
+}
+
+/**
+ * Who rendered it, as a tree, outermost first.
+ *
+ * Every frame is a link: the answer to "where did this come from" is usually
+ * not the innermost component but the column or the mapper two frames out, and
+ * that is only useful if it opens.
+ */
+function treeView(frames: readonly Frame[]): HTMLElement {
+	const tree = element("div", "tree");
+
+	frames.forEach((frame, depth) => {
+		const row = element("div", frame.target ? "frame on" : "frame");
+		row.append(element("span", "name", `${"  ".repeat(depth)}<${frame.name}>`));
+
+		const at = frame.at;
+		if (at) {
+			const where = element(
+				"button",
+				"where",
+				at.line > 0 ? `${at.file}:${at.line}` : at.file,
+			);
+			where.addEventListener("click", () => openInEditor(at));
+			row.append(where);
+		}
+		tree.append(row);
+	});
+
+	return tree;
 }
 
 function codeOf(found: Excerpt): DocumentFragment {
@@ -262,19 +288,18 @@ function fillBody(body: HTMLElement, source: unknown, path?: string): void {
 }
 
 async function fillCode(
-	target: HTMLElement,
+	code: HTMLElement,
 	provenance: Provenance,
 	mine: number,
 ): Promise<void> {
-	const hop = provenance.hops.find(
-		(candidate) => candidate.file && candidate.line,
-	);
-	if (!hop?.file || !hop.line) return;
+	// The innermost frame we could locate: the closest line to the value itself.
+	const at = innermost(provenance.tree);
+	if (!at) return;
 
-	const found = await excerpt(hop.file, hop.line);
+	const found = await excerpt(at.file, at.line);
 	if (!found || mine !== generation) return;
 
-	target.append(codeOf(found));
+	code.append(codeOf(found));
 }
 
 export function show(provenance: Provenance): void {
@@ -306,6 +331,7 @@ export function show(provenance: Provenance): void {
 		chainOf(provenance, (path) => {
 			if (body) fillBody(body, source, path);
 		}),
+		treeView(provenance.tree),
 		code,
 	);
 	if (body) panel.append(body);

@@ -192,31 +192,86 @@ describe("resolve", () => {
 	});
 });
 
-describe("the component hop", () => {
-	test("names the component that rendered the text", () => {
+describe("the render tree", () => {
+	test("reads outermost first, with the pointed-at frame marked", () => {
 		seed({ name: "Барыс" });
 
 		const cell = attachFiber(render("<div>Барыс</div>"), {
-			// React hangs fibers off host elements, so the component sits up
-			// the return chain rather than on the node itself.
+			// React hangs fibers off host elements, so the component that wrote
+			// the element is its owner rather than the node itself.
+			type: "div",
+			_debugOwner: {
+				type: function WorkRow() {},
+				_debugOwner: { type: function WorksTable() {}, _debugOwner: null },
+			},
+		});
+
+		expect(resolve(cell)?.tree).toEqual([
+			{ name: "WorksTable", at: undefined, target: false },
+			{ name: "WorkRow", at: undefined, target: false },
+			{ name: "div", at: undefined, target: true },
+		]);
+	});
+
+	test("falls back to the parent chain without React's debug fields", () => {
+		seed({ name: "Барыс" });
+
+		const cell = attachFiber(render("<div>Барыс</div>"), {
 			type: "div",
 			return: { type: function WorkRow() {}, return: null },
 		});
 
-		expect(resolve(cell)?.hops.at(-1)).toMatchObject({
-			kind: "component",
-			label: "<WorkRow>",
-		});
+		expect(resolve(cell)?.tree.map((frame) => frame.name)).toEqual([
+			"WorkRow",
+			"div",
+		]);
 	});
 
-	test("uses displayName for wrappers such as memo", () => {
+	test("unwraps memo and forwardRef to the name underneath", () => {
 		const cell = attachFiber(render("<div>Барыс</div>"), {
 			type: { displayName: "MemoWorkRow" },
 			return: null,
 		});
+		const forwarded = attachFiber(render("<div>Астана</div>"), {
+			type: { render: function Field() {} },
+			return: null,
+		});
 
-		expect(resolve(cell)?.hops.at(-1)).toMatchObject({
-			label: "<MemoWorkRow>",
+		expect(resolve(cell)?.tree.at(0)?.name).toBe("MemoWorkRow");
+		expect(resolve(forwarded)?.tree.at(0)?.name).toBe("Field");
+	});
+
+	test("takes the position out of the stack React captured", () => {
+		const cell = attachFiber(render("<div>Барыс</div>"), {
+			type: "div",
+			_debugStack: {
+				stack: [
+					"Error: react-stack-top-frame",
+					"    at jsxDEV (http://localhost/node_modules/.vite/deps/react_jsx-dev-runtime.js:250:23)",
+					"    at WorkRow (http://localhost/src/works.tsx:41:9)",
+				].join("\n"),
+			},
+			_debugOwner: null,
+		});
+
+		expect(resolve(cell)?.tree.at(-1)?.at).toEqual({
+			file: "/src/works.tsx",
+			line: 41,
+			column: 9,
+		});
+	});
+
+	test("prefers what the Babel transform recorded, where it ran", () => {
+		const cell = attachFiber(render("<div>Барыс</div>"), {
+			type: "div",
+			_debugSource: { fileName: "src/works.tsx", lineNumber: 41 },
+			_debugOwner: null,
+		});
+
+		expect(resolve(cell)?.tree.at(-1)?.at).toEqual({
+			file: "src/works.tsx",
+			line: 41,
+			column: 0,
 		});
 	});
 
@@ -228,11 +283,8 @@ describe("the component hop", () => {
 
 		const found = resolve(label);
 		expect(found?.broken).toBe(true);
-		expect(found?.hops).toHaveLength(1);
-		expect(found?.hops.at(-1)).toMatchObject({
-			kind: "component",
-			label: "<WorkForm>",
-		});
+		expect(found?.hops).toEqual([]);
+		expect(found?.tree.at(-1)?.name).toBe("WorkForm");
 	});
 });
 
@@ -242,7 +294,7 @@ describe("source attributes", () => {
 			'<div data-tsd-source="src/works.table-columns.tsx:41:9">Барыс</div>',
 		);
 
-		expect(resolve(cell)?.hops.at(-1)).toMatchObject({
+		expect(resolve(cell)?.tree.at(-1)?.at).toEqual({
 			file: "src/works.table-columns.tsx",
 			line: 41,
 			column: 9,
@@ -254,10 +306,7 @@ describe("source attributes", () => {
 			'<div data-camefrom-source="ours.tsx:1:1" data-tsd-source="theirs.tsx:2:2">Барыс</div>',
 		);
 
-		expect(resolve(cell)?.hops.at(-1)).toMatchObject({
-			file: "ours.tsx",
-			line: 1,
-		});
+		expect(resolve(cell)?.tree.at(-1)?.at?.file).toBe("ours.tsx");
 	});
 
 	test("are found on an ancestor, not just the node itself", () => {
@@ -266,18 +315,31 @@ describe("source attributes", () => {
 		);
 		const cell = document.querySelector("span");
 
-		expect(resolve(cell)?.hops.at(-1)).toMatchObject({
-			file: "src/works.row.tsx",
-			line: 10,
-		});
+		expect(resolve(cell)?.tree.at(-1)?.at?.line).toBe(10);
 	});
 
 	test("degrade to a bare file when there is no position", () => {
 		const cell = render('<div data-tsd-source="src/works.tsx">Барыс</div>');
 
-		expect(resolve(cell)?.hops.at(-1)).toMatchObject({
+		expect(resolve(cell)?.tree.at(-1)?.at).toEqual({
 			file: "src/works.tsx",
-			line: undefined,
+			line: 0,
+			column: 0,
 		});
+	});
+
+	test("fill in a position React did not record for the frame", () => {
+		const cell = attachFiber(
+			render('<div data-tsd-source="src/works.tsx:41:9">Барыс</div>'),
+			{ type: "div", _debugOwner: null },
+		);
+
+		expect(resolve(cell)?.tree).toEqual([
+			{
+				name: "div",
+				at: { file: "src/works.tsx", line: 41, column: 9 },
+				target: true,
+			},
+		]);
 	});
 });

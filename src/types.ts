@@ -8,14 +8,34 @@ export interface RequestMeta {
 	durationMs: number;
 }
 
+/** A place in a source file, as an editor would be told to open it. */
+export interface Position {
+	file: string;
+	line: number;
+	column: number;
+}
+
 /** One step of the chain, rendered as one line in the panel. */
 export interface Hop {
-	kind: "response" | "read" | "component";
-	/** Human readable label, e.g. `items[3].contractor.name` or `<WorkRow>`. */
+	kind: "response" | "read";
+	/** Human readable label, e.g. `items[3].contractor.name`. */
 	label: string;
-	file?: string;
-	line?: number;
-	column?: number;
+}
+
+/**
+ * One component of the tree that rendered the value, outermost first.
+ *
+ * The tree rather than the nearest component alone: knowing a `<Cell>` showed
+ * the text is no help when there are forty of them, and the column that built
+ * it is three frames up.
+ */
+export interface Frame {
+	/** `WorkRow` for a component, `td` for a host element. */
+	name: string;
+	/** Where its JSX is written, when React or an inspector recorded it. */
+	at?: Position;
+	/** The innermost frame: the one that rendered the text you pointed at. */
+	target: boolean;
 }
 
 /**
@@ -42,5 +62,7 @@ export interface Provenance {
 	/** Parsed response body as recorded, for showing it inline. */
 	response?: unknown;
 	hops: Hop[];
+	/** Who rendered it, outermost first. Empty outside React. */
+	tree: Frame[];
 	broken: boolean;
 }

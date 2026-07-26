@@ -1,4 +1,4 @@
-import type { Provenance } from "./types";
+import type { Frame, Provenance } from "./types";
 
 /** Candidates worth reading one by one before a count says more. */
 const MAX_LISTED = 6;
@@ -8,17 +8,20 @@ function title(value: unknown): string {
 	return typeof value === "string" ? `"${value}"` : String(value);
 }
 
+/** `<WorkRow>  src/works.tsx:41`, indented to its depth in the tree. */
+function frame(entry: Frame, depth: number): string {
+	const indent = "  ".repeat(depth + 1);
+	const at = entry.at;
+	const where = at && at.line > 0 ? ` · ${at.file}:${at.line}` : "";
+	return `${indent}<${entry.name}>${where}`;
+}
+
 /**
  * The chain as lines, nearest step first. Pure, so the wording is testable
  * without a console.
  */
 export function format(provenance: Provenance): string[] {
-	const lines = provenance.hops.map((hop) => {
-		const where = hop.file
-			? `${hop.file}${hop.line ? `:${hop.line}` : ""}`
-			: undefined;
-		return where ? `← ${hop.label} · ${where}` : `← ${hop.label}`;
-	});
+	const lines = provenance.hops.map((hop) => `← ${hop.label}`);
 
 	// Which of them it is cannot be told apart from here, so all of them are
 	// named. A single confident line would be the more useful shape and the
@@ -29,6 +32,13 @@ export function format(provenance: Provenance): string[] {
 		}
 		const rest = provenance.ambiguous.length - MAX_LISTED;
 		if (rest > 0) lines.push(`  ? …${rest} more`);
+	}
+
+	// The tree rather than the nearest component: a `<Cell>` is forty cells, and
+	// the column that built this one is three frames further out.
+	if (provenance.tree.length > 0) {
+		lines.push("← rendered by");
+		provenance.tree.forEach((entry, depth) => lines.push(frame(entry, depth)));
 	}
 
 	if (provenance.broken) {
