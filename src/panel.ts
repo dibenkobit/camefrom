@@ -86,6 +86,8 @@ const STYLE = `
 .note { padding-top: 4px; color: var(--warn); overflow-wrap: anywhere; }
 .why { color: var(--warn); opacity: 0.85; }
 .why.link { all: unset; color: var(--warn); cursor: pointer; text-decoration: underline; }
+.stack { padding-left: 14px; color: var(--dim); white-space: pre; }
+.stack[hidden] { display: none; }
 /* Rows are only ever as wide as the box that scrolls them, which cuts every
    mark off where the viewport happens to end. Sized to the longest line here
    instead, so the rows inside can stretch to it and the mark ends up a block
@@ -445,18 +447,30 @@ function chainOf(
  * Offered rather than asserted: "the engine left no frame for it" is a claim
  * about somebody else's optimiser, and the only way to be sure of it is to read
  * what React actually captured.
+ *
+ * Under the row it was offered on, rather than in the console: a button that
+ * puts its whole answer in another window has, from where the reader is sitting,
+ * done nothing at all.
  */
-function reasonFor(frame: Frame): HTMLElement {
+function reasonFor(frame: Frame, into: HTMLElement): HTMLElement {
 	const missing = frame.missing;
 	if (!missing) return element("span", "why");
 	if (!frame.stack) return element("span", "why", MISSING[missing]);
 
-	const why = element("button", "why link", `${MISSING[missing]} · show it`);
+	const stack = element("div", "stack", frame.stack);
+	stack.hidden = true;
+	into.append(stack);
+
+	const why = element("button", "why link");
+	const say = (): void => {
+		why.textContent = `${MISSING[missing]} · ${stack.hidden ? "show it" : "hide it"}`;
+	};
+
 	why.addEventListener("click", () => {
-		console.log(
-			`camefrom: the stack React captured for <${frame.name}>, which names no frame of your own:\n${frame.stack}`,
-		);
+		stack.hidden = !stack.hidden;
+		say();
 	});
+	say();
 	return why;
 }
 
@@ -469,11 +483,10 @@ function treeView(frames: readonly Frame[]): HTMLElement {
 
 		const at = frame.at;
 		if (!at) {
-			// A row with a name and nothing else reads as the tool having failed.
-			if (frame.missing) {
-				row.append(reasonFor(frame));
-			}
 			tree.append(row);
+			// A row with a name and nothing else reads as the tool having failed.
+			// The reason goes on the row, and what it was read off underneath it.
+			if (frame.missing) row.append(reasonFor(frame, tree));
 			return;
 		}
 

@@ -294,6 +294,42 @@ describe("a press outside the panel", () => {
 	});
 });
 
+describe("a frame with no line of its own", () => {
+	const captured = [
+		"Error: react-stack-top-frame",
+		"    at jsxDEV (http://localhost:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js:250:23)",
+		"    at react_stack_bottom_frame (http://localhost:5173/node_modules/.vite/deps/chunk-ABC.js:17422:20)",
+	].join("\n");
+
+	function inlined(): Provenance {
+		return traced({
+			tree: [{ name: "td", missing: "inlined", stack: captured, target: true }],
+		});
+	}
+
+	test("says why, and keeps the evidence out of the way until asked", () => {
+		show(inlined());
+
+		expect(part(".why.link").textContent).toContain("show it");
+		expect(part(".stack").hidden).toBe(true);
+	});
+
+	test("shows the stack in the panel, and puts it back", () => {
+		show(inlined());
+
+		// In the panel, because that is where the button offering it is. A reader
+		// who has to go and find the console has been shown nothing.
+		part(".why.link").click();
+		expect(part(".stack").hidden).toBe(false);
+		expect(part(".stack").textContent).toContain("react_stack_bottom_frame");
+		expect(part(".why.link").textContent).toContain("hide it");
+
+		part(".why.link").click();
+		expect(part(".stack").hidden).toBe(true);
+		expect(part(".why.link").textContent).toContain("show it");
+	});
+});
+
 describe("hide", () => {
 	test("takes the panel out of the page", () => {
 		show(traced());
