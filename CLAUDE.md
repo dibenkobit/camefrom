@@ -24,3 +24,9 @@ paragraphs of argument — and is just as good at killing an idea early.
 **The bar is done well, not it works.** Working is the floor. Naming, comments,
 commit history, error messages and defaults are part of the product, not
 decoration on top of it.
+
+**No barrel files.** A folder never gets an `index.ts` that re-exports what is
+inside it. An import names the file it wants — `from "../capture/store"`, never
+`from "../capture"`. The path is what says where a function actually lives, and
+a barrel spends a whole file on hiding it. `src/index.ts` is not an exception to
+this: it is the package's entry point, and what it exports is the public API.
