@@ -1,0 +1,20 @@
+version: 2
+
+updates:
+  # Actions are the supply chain most likely to be forgotten and the one that
+  # has actually been attacked. Grouped so it stays one pull request a month.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      dev-dependencies:
+        patterns: ['*']

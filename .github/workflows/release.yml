@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Turns the conventional commits we already write into a release pull
+  # request. Merging that PR tags the version and creates the GitHub release,
+  # which is what lets the job below run.
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          release-type: node
+
+  publish:
+    needs: prepare
+    if: needs.prepare.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # The only credential in this repository. Trusted publishing exchanges
+      # this token with npm, so there is no NPM_TOKEN to leak or rotate, and
+      # provenance is attached automatically.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or newer, which the runner image
+      # does not always ship.
+      - run: npm install --global npm@latest
+
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun test
+
+      # Publishing is the one thing Bun cannot do here: `bun publish` has no
+      # OIDC or provenance support, so npm does this step and Bun does the
+      # rest. The build runs through prepublishOnly.
+      - run: npm publish
