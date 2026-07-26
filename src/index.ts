@@ -3,7 +3,6 @@ import { report } from "./report";
 import { resolve } from "./resolve";
 import type { Provenance } from "./types";
 
-export { format } from "./report";
 export type { Hop, Provenance, RequestMeta } from "./types";
 
 let installed = false;
