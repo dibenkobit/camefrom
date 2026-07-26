@@ -11,10 +11,17 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+# Actions are pinned to a commit here, and only here. This is the one job that
+# can publish, so a hijacked tag would cost the package itself rather than a
+# red run. Dependabot moves the pins and rewrites the version comment.
 jobs:
   # Turns the conventional commits we already write into a release pull
   # request. Merging that PR tags the version and creates the GitHub release,
   # which is what lets the job below run.
+  #
+  # That pull request is created with the built-in GITHUB_TOKEN, and GitHub
+  # deliberately does not start workflows from it, so CI never runs on it.
+  # The publish job below therefore repeats every check CI does.
   prepare:
     runs-on: ubuntu-latest
     permissions:
@@ -26,7 +33,7 @@ jobs:
       # Strategy lives in release-please-config.json. The action takes only a
       # handful of inputs and silently warns about the rest, so anything it
       # does not name belongs in the config file.
-      - uses: googleapis/release-please-action@v5
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
 
   publish:
@@ -40,23 +47,28 @@ jobs:
       # provenance is attached automatically.
       id-token: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
-      - uses: actions/setup-node@v7
+      # Node 24 ships an npm new enough for trusted publishing on its own.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      # Trusted publishing needs npm 11.5.1 or newer, which the runner image
-      # does not always ship.
-      - run: npm install --global npm@latest
-
       - run: bun install --frozen-lockfile
+
+      # The same list CI runs, in the same order, because this is the only
+      # place it runs for a release commit. The build is explicit so that the
+      # pack below has a dist/ to look at; publishing rebuilds it anyway
+      # through prepublishOnly.
+      - run: bun run check
       - run: bun run typecheck
       - run: bun test
+      - run: bun run build
+      - run: bun pm pack --dry-run
 
       # Publishing is the one thing Bun cannot do here: `bun publish` has no
       # OIDC or provenance support, so npm does this step and Bun does the
-      # rest. The build runs through prepublishOnly.
+      # rest.
       - run: npm publish

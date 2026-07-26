@@ -11,8 +11,15 @@ updates:
       actions:
         patterns: ['*']
 
-  # No npm entry on purpose. Dependabot updates package.json but leaves
-  # bun.lock untouched, so every pull request it opens fails the frozen
-  # lockfile check by construction. Three devDependencies are cheaper to bump
-  # by hand with `bun update`; Renovate is the answer if that ever stops being
-  # true.
+  # Dependabot has spoken Bun since 1.1.39, so it updates bun.lock next to
+  # package.json and its pull requests survive the frozen lockfile check.
+  # Grouped for the same reason as above: three devDependencies are not worth
+  # three pull requests. Note that Bun is version updates only — a vulnerable
+  # transitive dependency will not raise a pull request of its own.
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      dependencies:
+        patterns: ['*']
