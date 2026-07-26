@@ -1,7 +1,7 @@
 ---
 description: How work is done here, and using Bun instead of Node.js, npm or pnpm.
 globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
-alwaysApply: false
+alwaysApply: true
 ---
 
 # Working principles
