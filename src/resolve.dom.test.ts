@@ -143,6 +143,23 @@ describe("telling identical values apart", () => {
 		expect(found?.hops[0]?.label).toBe("3 fields hold this value");
 	});
 
+	test("narrows the value index by a record it can place", () => {
+		const body = seed(documents());
+		const source = (body.data as unknown[])[1] as { id: number };
+		// A model object keeping the name behind a getter. A click must not run
+		// someone else's accessor, so the record cannot answer which field holds
+		// the text — but its `id` still says which record it is, and that is
+		// enough to throw away every read belonging to another row.
+		const row = {
+			id: source.id,
+			get full_name(): string {
+				return "Alpyspayev Bakhtiyar";
+			},
+		};
+
+		expect(resolve(cellHolding(row))?.path).toBe("data[1].full_name");
+	});
+
 	test("reaches the record through a wrapper a table library added", () => {
 		const body = seed(documents());
 		// What a TanStack Table cell is handed: the record is on `.original`.

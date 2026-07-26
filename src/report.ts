@@ -38,7 +38,9 @@ export function format(provenance: Provenance): string[] {
 	// the column that built this one is three frames further out.
 	if (provenance.tree.length > 0) {
 		lines.push("← rendered by");
-		provenance.tree.forEach((entry, depth) => lines.push(frame(entry, depth)));
+		provenance.tree.forEach((entry, depth) => {
+			lines.push(frame(entry, depth));
+		});
 	}
 
 	if (provenance.broken) {
