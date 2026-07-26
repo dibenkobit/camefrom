@@ -204,9 +204,9 @@ describe("when the record never reaches the component", () => {
 
 	/** The cell the pointer would land on: row `row`, column `column`. */
 	function cellIn(row: number, column: number): Node {
-		const cell = document
-			.querySelectorAll("tr")
-			[row]?.querySelectorAll("div")[column];
+		const cell = document.querySelectorAll("tr")[row]?.querySelectorAll("div")[
+			column
+		];
 		if (!cell) throw new Error("no such cell");
 		return cell;
 	}

@@ -293,7 +293,9 @@ function amongst<T extends Field>(
 	const tracedAt = branches.indexOf(branch);
 	if (tracedAt < 0 || branches.length < 2) return undefined;
 
-	const kept = (fits: (ordinal: number) => boolean): readonly T[] | undefined => {
+	const kept = (
+		fits: (ordinal: number) => boolean,
+	): readonly T[] | undefined => {
 		const left = hits.filter((_, index) => fits(ordinals[index] ?? -1));
 		return left.length > 0 && left.length < hits.length ? left : undefined;
 	};
@@ -312,10 +314,12 @@ function amongst<T extends Field>(
 	// A list counts up or it counts down. One that does neither is not something
 	// to read positions off, whatever else it is.
 	const ordered = placed.every(
-		(row, index) => index === 0 || row.ordinal > (placed[index - 1]?.ordinal ?? 0),
+		(row, index) =>
+			index === 0 || row.ordinal > (placed[index - 1]?.ordinal ?? 0),
 	);
 	const reversed = placed.every(
-		(row, index) => index === 0 || row.ordinal < (placed[index - 1]?.ordinal ?? 0),
+		(row, index) =>
+			index === 0 || row.ordinal < (placed[index - 1]?.ordinal ?? 0),
 	);
 	if (!ordered && !reversed) return undefined;
 

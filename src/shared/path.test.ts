@@ -73,7 +73,9 @@ describe("sharedSteps", () => {
 
 	/** The reason steps are counted rather than characters compared. */
 	test("a neighbouring index is not a deeper agreement", () => {
-		expect(sharedSteps(segments("[4].region"), segments("[40].region"))).toBe(0);
+		expect(sharedSteps(segments("[4].region"), segments("[40].region"))).toBe(
+			0,
+		);
 	});
 });
 
