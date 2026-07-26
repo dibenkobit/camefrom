@@ -14,12 +14,23 @@ export function title(value: unknown): string {
 	return typeof value === "string" ? `"${value}"` : String(value);
 }
 
+/** Why a frame has no line. A row with neither reads as a broken tool. */
+const MISSING: Record<NonNullable<Frame["missing"]>, string> = {
+	untracked: "React stopped recording call sites; reload to get them back",
+	inlined: "no frame for it in the stack React captured",
+	unmapped: "no source map for the module it is in",
+	unrecorded: "this build of React records no positions",
+};
+
 /** `<WorkRow>  src/works.tsx:41`, indented to its depth in the tree. */
 function frame(entry: Frame, depth: number): string {
 	const indent = "  ".repeat(depth + 1);
 	const at = entry.at;
-	const where = at && at.line > 0 ? ` · ${at.file}:${at.line}` : "";
-	return `${indent}<${entry.name}>${where}`;
+	if (at && at.line > 0)
+		return `${indent}<${entry.name}> · ${at.file}:${at.line}`;
+
+	const why = entry.missing ? ` · ${MISSING[entry.missing]}` : "";
+	return `${indent}<${entry.name}>${at ? ` · ${at.file}` : why}`;
 }
 
 /**
@@ -48,11 +59,11 @@ export function format(provenance: Provenance): string[] {
 			lines.push(frame(entry, depth));
 		});
 
-		// Why the frame that was pointed at carries no line. Left unsaid it reads
-		// as the tool having failed, rather than as something a reload fixes.
-		if (provenance.tree.at(-1)?.untracked) {
+		// The one cause a reader can act on, so it is worth more than the short
+		// form on the row: reloading brings every line in the tree back.
+		if (provenance.tree.some((entry) => entry.missing === "untracked")) {
 			lines.push(
-				"  ! React records the position of the first 10 000 elements only; reload to get them back",
+				"  ! React records the call site of the first 10 000 elements only, and never starts again; reload to get them back",
 			);
 		}
 	}

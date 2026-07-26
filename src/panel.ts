@@ -84,6 +84,7 @@ const STYLE = `
 .code:empty { display: none; }
 .origin { padding: 0 12px 6px; color: var(--dim); }
 .note { padding-top: 4px; color: var(--warn); overflow-wrap: anywhere; }
+.why { color: var(--warn); opacity: 0.85; }
 .line { display: flex; gap: 10px; padding: 0 12px; white-space: pre; }
 .line.on { background: var(--mark); color: var(--fg); }
 .num { min-width: 2.5em; text-align: right; color: var(--dim); user-select: none; }
@@ -102,9 +103,20 @@ const STYLE = `
 
 /** Candidate fields worth a row of their own before a count says more. */
 const MAX_CHOICES = 12;
-/** Why the frame that was pointed at has no line, and what to do about it. */
-const UNTRACKED =
-	"React records the position of the first 10 000 elements only · reload the page to get them back";
+/**
+ * Why a frame has no line. Short, because it sits on the row itself, and each
+ * one names what would change it rather than only what went wrong.
+ */
+const MISSING: Record<NonNullable<Frame["missing"]>, string> = {
+	untracked: "React stopped recording · reload",
+	inlined: "no frame for it in the stack",
+	unmapped: "no source map for this module",
+	unrecorded: "this build records no positions",
+};
+
+/** The one cause worth spelling out, because reloading actually fixes it. */
+const RELOAD =
+	"React records the call site of the first 10 000 elements only, and never starts again · reload the page to get them back";
 /** How far the panel keeps clear of the point it was opened at. */
 const GAP = 14;
 /**
@@ -416,6 +428,10 @@ function treeView(frames: readonly Frame[]): HTMLElement {
 
 		const at = frame.at;
 		if (!at) {
+			// A row with a name and nothing else reads as the tool having failed.
+			if (frame.missing) {
+				row.append(element("span", "why", MISSING[frame.missing]));
+			}
 			tree.append(row);
 			return;
 		}
@@ -428,10 +444,12 @@ function treeView(frames: readonly Frame[]): HTMLElement {
 		tree.append(row);
 
 		void written(at).then((original) => {
-			// No map, or nothing mapped: the frame keeps its name and loses the
-			// link. An unmappable line is not a line worth printing.
+			// No map, or nothing mapped. The recorded line is a line in a bundle
+			// and printing it would name whatever happens to sit there in the
+			// file, so the row says that instead of showing it.
 			if (!original) {
-				where.remove();
+				where.className = "why";
+				where.textContent = MISSING.unmapped;
 				return;
 			}
 			where.textContent =
@@ -440,11 +458,10 @@ function treeView(frames: readonly Frame[]): HTMLElement {
 		});
 	});
 
-	// The frame that was pointed at has no line, and never will have one. Saying
-	// why, and what to do about it, is what stops a missing link from reading as
-	// a broken tool.
-	if (frames.at(-1)?.untracked) {
-		tree.append(element("div", "note", UNTRACKED));
+	// Spelled out under the tree as well as on the row, because this is the one
+	// cause a reader can act on, and acting on it brings every line back.
+	if (frames.some((frame) => frame.missing === "untracked")) {
+		tree.append(element("div", "note", RELOAD));
 	}
 	return tree;
 }

@@ -224,9 +224,16 @@ describe("the render tree", () => {
 		});
 
 		expect(resolve(cell)?.tree).toEqual([
-			{ name: "WorksTable", at: undefined, target: false },
-			{ name: "WorkRow", at: undefined, target: false },
-			{ name: "div", at: undefined, target: true },
+			// No debug stack on these, so why they have no line is unknown rather
+			// than blamed on React's budget.
+			{
+				name: "WorksTable",
+				at: undefined,
+				missing: "unrecorded",
+				target: false,
+			},
+			{ name: "WorkRow", at: undefined, missing: "unrecorded", target: false },
+			{ name: "div", at: undefined, missing: "unrecorded", target: true },
 		]);
 	});
 
@@ -382,7 +389,7 @@ describe("when React has stopped recording positions", () => {
 		expect(resolve(cell)?.tree.at(-1)).toEqual({
 			name: "div",
 			at: undefined,
-			untracked: true,
+			missing: "untracked",
 			target: true,
 		});
 	});
@@ -393,6 +400,24 @@ describe("when React has stopped recording positions", () => {
 			return: null,
 		});
 
-		expect(resolve(cell)?.tree.at(-1)?.untracked).toBeUndefined();
+		// Nothing recorded it, which is not the same as a budget having run out —
+		// telling somebody to reload would waste their time.
+		expect(resolve(cell)?.tree.at(-1)?.missing).toBe("unrecorded");
+	});
+
+	test("a stack with no frame of the app's own says exactly that", () => {
+		const cell = attachFiber(render("<div>Барыс</div>"), {
+			type: "div",
+			_debugStack: {
+				stack: [
+					"Error: react-stack-top-frame",
+					"    at jsxDEV (http://localhost/node_modules/react/jsx-dev-runtime.js:250:23)",
+					"    at react_stack_bottom_frame (http://localhost/node_modules/react-dom/client.js:174:20)",
+				].join("\n"),
+			},
+			_debugOwner: null,
+		});
+
+		expect(resolve(cell)?.tree.at(-1)?.missing).toBe("inlined");
 	});
 });

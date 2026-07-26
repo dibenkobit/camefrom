@@ -110,16 +110,16 @@ function stackOf(fiber: Fiber): unknown {
 }
 
 /**
- * Whether React was still recording positions when this element was made.
+ * Why this element has no position, as far as can be told from here.
  *
- * True when there is nothing to blame — no stack at all means a build without
- * React's debug fields, not a budget that ran out, and saying otherwise would
- * send somebody reloading for no reason.
+ * Guessed at nothing: each answer comes from something observable — the shared
+ * placeholder React substitutes once it stops recording, a stack with no frame
+ * of the app's own in it, or no debug field at all.
  */
-function recorded(fiber: Fiber): boolean {
-	if (fiber._debugSource) return true;
+function missing(fiber: Fiber): NonNullable<Frame["missing"]> {
 	const stack = stackOf(fiber);
-	return typeof stack === "string" ? !untracked(stack) : true;
+	if (typeof stack !== "string") return "unrecorded";
+	return untracked(stack) ? "untracked" : "inlined";
 }
 
 /** What an inspector wrote on the DOM, for when React recorded nothing. */
@@ -188,7 +188,7 @@ export function treeOf(fiber: Fiber | undefined): Frame[] {
 			name,
 			at,
 			target: frames.length === 0,
-			...(at || recorded(current) ? {} : { untracked: true }),
+			...(at ? {} : { missing: missing(current) }),
 		});
 	}
 	return frames.reverse();

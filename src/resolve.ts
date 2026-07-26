@@ -231,6 +231,9 @@ function positioned(tree: Frame[], target: Node): Frame[] {
 	if (!at) return tree;
 	if (innermost) {
 		innermost.at = at;
+		// Whatever React failed to record, an inspector did. Leaving the reason
+		// on a frame that now has a position would contradict it.
+		delete innermost.missing;
 		return tree;
 	}
 

@@ -42,12 +42,22 @@ export interface Frame {
 	/** Where its JSX is written, when React or an inspector recorded it. */
 	at?: Position;
 	/**
-	 * Set when React had already stopped recording positions by the time this
-	 * element was created — it keeps the call site of the first ten thousand and
-	 * nothing after. Tells a position we failed to read apart from one that was
-	 * never written down, which is the difference between a bug and a reload.
+	 * Why there is no `at`, when we can tell.
+	 *
+	 * A frame with no line and no reason is indistinguishable from a broken
+	 * tool, and each of these has a different answer: `untracked` is fixed by
+	 * reloading, `unmapped` by a dev server that emits source maps, and
+	 * `inlined` by nothing at all.
+	 *
+	 * - `untracked` — React had stopped recording call sites. It keeps the first
+	 *   ten thousand and hands out a shared placeholder after that.
+	 * - `inlined` — React was recording, but the engine left no frame for the
+	 *   component in the stack it captured.
+	 * - `unmapped` — a position was recorded, in a bundler's output, and no
+	 *   source map could say where it was written.
+	 * - `unrecorded` — this build of React records no positions at all.
 	 */
-	untracked?: boolean;
+	missing?: "untracked" | "inlined" | "unmapped" | "unrecorded";
 	/** The innermost frame: the one that rendered the text you pointed at. */
 	target: boolean;
 }
