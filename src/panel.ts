@@ -85,6 +85,7 @@ const STYLE = `
 .origin { padding: 0 12px 6px; color: var(--dim); }
 .note { padding-top: 4px; color: var(--warn); overflow-wrap: anywhere; }
 .why { color: var(--warn); opacity: 0.85; }
+.why.link { all: unset; color: var(--warn); cursor: pointer; text-decoration: underline; }
 .line { display: flex; gap: 10px; padding: 0 12px; white-space: pre; }
 .line.on { background: var(--mark); color: var(--fg); }
 .num { min-width: 2.5em; text-align: right; color: var(--dim); user-select: none; }
@@ -419,6 +420,28 @@ function chainOf(
  * not the innermost component but the column or the mapper two frames out, and
  * that is only useful if it opens.
  */
+/**
+ * Why a frame has no line, and — where the reason is one nobody can act on —
+ * the stack it was concluded from.
+ *
+ * Offered rather than asserted: "the engine left no frame for it" is a claim
+ * about somebody else's optimiser, and the only way to be sure of it is to read
+ * what React actually captured.
+ */
+function reasonFor(frame: Frame): HTMLElement {
+	const missing = frame.missing;
+	if (!missing) return element("span", "why");
+	if (!frame.stack) return element("span", "why", MISSING[missing]);
+
+	const why = element("button", "why link", `${MISSING[missing]} · show it`);
+	why.addEventListener("click", () => {
+		console.log(
+			`camefrom: the stack React captured for <${frame.name}>, which names no frame of your own:\n${frame.stack}`,
+		);
+	});
+	return why;
+}
+
 function treeView(frames: readonly Frame[]): HTMLElement {
 	const tree = element("div", "tree");
 
@@ -430,7 +453,7 @@ function treeView(frames: readonly Frame[]): HTMLElement {
 		if (!at) {
 			// A row with a name and nothing else reads as the tool having failed.
 			if (frame.missing) {
-				row.append(element("span", "why", MISSING[frame.missing]));
+				row.append(reasonFor(frame));
 			}
 			tree.append(row);
 			return;

@@ -112,14 +112,17 @@ function stackOf(fiber: Fiber): unknown {
 /**
  * Why this element has no position, as far as can be told from here.
  *
- * Guessed at nothing: each answer comes from something observable — the shared
+ * Nothing is guessed: each answer comes from something observable — the shared
  * placeholder React substitutes once it stops recording, a stack with no frame
- * of the app's own in it, or no debug field at all.
+ * of the app's own in it, or no debug field at all. The last of those cannot be
+ * explained any further from outside the engine, so the stack itself is carried
+ * along to be read.
  */
-function missing(fiber: Fiber): NonNullable<Frame["missing"]> {
+function unexplained(fiber: Fiber): Pick<Frame, "missing" | "stack"> {
 	const stack = stackOf(fiber);
-	if (typeof stack !== "string") return "unrecorded";
-	return untracked(stack) ? "untracked" : "inlined";
+	if (typeof stack !== "string") return { missing: "unrecorded" };
+	if (untracked(stack)) return { missing: "untracked" };
+	return { missing: "inlined", stack };
 }
 
 /** What an inspector wrote on the DOM, for when React recorded nothing. */
@@ -188,7 +191,7 @@ export function treeOf(fiber: Fiber | undefined): Frame[] {
 			name,
 			at,
 			target: frames.length === 0,
-			...(at ? {} : { missing: missing(current) }),
+			...(at ? {} : unexplained(current)),
 		});
 	}
 	return frames.reverse();

@@ -58,6 +58,13 @@ export interface Frame {
 	 * - `unrecorded` — this build of React records no positions at all.
 	 */
 	missing?: "untracked" | "inlined" | "unmapped" | "unrecorded";
+	/**
+	 * The stack React captured, kept only when it named no frame of the app's
+	 * own. There is no way to tell from the outside why an engine left a frame
+	 * out, so the evidence is carried through and can be read rather than
+	 * described — the panel prints it on request.
+	 */
+	stack?: string;
 	/** The innermost frame: the one that rendered the text you pointed at. */
 	target: boolean;
 }

@@ -418,6 +418,10 @@ describe("when React has stopped recording positions", () => {
 			_debugOwner: null,
 		});
 
-		expect(resolve(cell)?.tree.at(-1)?.missing).toBe("inlined");
+		const frame = resolve(cell)?.tree.at(-1);
+		expect(frame?.missing).toBe("inlined");
+		// Carried through, because "the engine left the frame out" is a claim
+		// about somebody else's optimiser and the only proof is what was captured.
+		expect(frame?.stack).toContain("react_stack_bottom_frame");
 	});
 });
