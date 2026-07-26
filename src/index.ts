@@ -1,4 +1,5 @@
 import { intercept } from './intercept';
+import { resolve } from './resolve';
 import type { Provenance } from './types';
 
 export type { Hop, Provenance, RequestMeta } from './types';
@@ -24,10 +25,7 @@ export function install(): void {
  * for instance. Callers should treat `null` as "no data", never as an error.
  */
 export function camefrom(target: Node | null): Provenance | null {
-    if (!target) return null;
-    // TODO: resolve the exact text node, then join its value against the read
-    // log scoped to the owning component.
-    return null;
+    return resolve(target);
 }
 
 declare global {
