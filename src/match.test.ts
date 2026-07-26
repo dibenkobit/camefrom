@@ -35,6 +35,16 @@ describe("place", () => {
 		]);
 	});
 
+	test("recognises a node of the body handed back untainted", () => {
+		const body = documents();
+		recordResponse(meta, body);
+		// Not through the proxy, so there is no origin to read: the object is
+		// simply one the body already holds, and identity settles it.
+		expect(place(body.data[1] as object)).toMatchObject([
+			{ path: "data[1]", score: Number.POSITIVE_INFINITY },
+		]);
+	});
+
 	test("finds a copy of a record by the fields it kept", () => {
 		const tainted = seed(documents());
 		const copy = { ...((tainted.data as unknown[])[1] as object) };
