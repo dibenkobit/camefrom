@@ -10,18 +10,30 @@ find the component, find the prop, walk up to the hook, work out which request
 fed it, open the Network tab, expand the JSON, compare by eye. A minute and a
 half. Dozens of times a day.
 
-Alt-click it instead:
+Alt-click it instead, and a panel answers:
 
 ```
-camefrom "ТОО Барыс"
-  ← items[37].contractor.name
-  ← GET /api/works?status=active · 200 · 143ms
-  ← <WorkRow> · src/works.table-columns.tsx:41
-  response ▸ { items: [ … ] }
+┌ "ТОО Барыс"                                    ✕ ┐
+│ ← items[37].contractor.name                      │
+│ ← GET /api/works?status=active · 200 · 143ms     │
+│ ← <WorkRow>  src/works.table-columns.tsx:41      │
+├──────────────────────────────────────────────────┤
+│  40   return (                                   │
+│  41     <td>{formatContractor(contractor)}</td>  │  ← highlighted
+│  42   )                                          │
+├──────────────────────────────────────────────────┤
+│  "contractor": {                                 │
+│     "name": "ТОО Барыс"                          │  ← highlighted, scrolled to
+│  }                                               │
+└──────────────────────────────────────────────────┘
 ```
 
-The response body is logged as an object, so your console's own inspector
-browses it. You do not open the Network tab at all.
+Three things at once: the chain, the source around the line that rendered it,
+and the response body scrolled to the exact field. Clicking the file opens your
+editor there. Escape closes the panel. The same chain also goes to the console,
+where the body is logged as a real object for the inspector to browse.
+
+The Network tab does not come into it.
 
 ## Install
 
@@ -91,9 +103,10 @@ its `data-tsd-source` attributes are picked up for exact file and line numbers.
 
 ## Not yet
 
-- No panel. The console is the whole interface for now.
 - Intermediate transforms are not named — the chain jumps from the read to the
   component.
+- The source excerpt needs a dev server that answers `?raw`, which today means
+  Vite. Elsewhere the panel simply leaves that part out.
 - `XMLHttpRequest` with `responseType: "json"` is invisible: the browser parses
   it internally and never calls `JSON.parse`.
 

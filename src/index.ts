@@ -1,4 +1,5 @@
 import { intercept } from "./intercept";
+import { show } from "./panel";
 import { report } from "./report";
 import { resolve } from "./resolve";
 import type { Provenance } from "./types";
@@ -34,17 +35,32 @@ function listen(): void {
 		"click",
 		(event) => {
 			if (!event.altKey) return;
-			const found = resolve(nodeAt(event));
-			if (!found) return;
 
-			// Only once we have something to say: an alt-click that traces
-			// nothing should behave like an ordinary click.
+			const found = resolve(nodeAt(event));
+			if (!found) {
+				// Silence here is the worst possible answer: it cannot be told
+				// apart from a tool that never loaded.
+				console.log("camefrom: no text under the pointer");
+				return;
+			}
+
+			// Only once there is something to say. An alt-click that traces
+			// nothing should still behave like an ordinary click.
 			event.preventDefault();
 			event.stopPropagation();
+			show(found);
 			report(found);
 		},
 		// Captured, so an app that swallows clicks cannot swallow this one.
 		true,
+	);
+
+	// Says the tool is alive and how to use it, which is the difference between
+	// "nothing happened" being a bug report and being a question.
+	console.log(
+		"%ccamefrom%c alt-click any text to see where it came from",
+		"font-weight:bold",
+		"font-weight:normal",
 	);
 }
 
