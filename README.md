@@ -10,35 +10,42 @@ find the component, find the prop, walk up to the hook, work out which request
 fed it, open the Network tab, expand the JSON, compare by eye. A minute and a
 half. Dozens of times a day.
 
-Hold alt and the answer follows the pointer, a line at a time. Alt-click and a
-panel answers in full:
+Hold alt and the answer follows the pointer. Click and it answers in full:
 
 ```
-┌ "ТОО Барыс"                                    ✕ ┐
-│ ← items[37].contractor.name                      │
-│ ← GET /api/works?status=active · 200 · 143ms     │
-│ ← rendered by                                    │
-│     <WorksPage>    src/works.page.tsx:18         │
-│       <WorksTable> src/works.tsx:64              │
-│         <WorkRow>  src/works.table-columns.tsx:41│
-│           <td>     src/works.row.tsx:12          │  ← highlighted
-├──────────────────────────────────────────────────┤
-│  11   return (                                   │
-│  12     <td>{formatContractor(contractor)}</td>  │  ← highlighted
-│  13   )                                          │
-├──────────────────────────────────────────────────┤
-│  "contractor": {                                 │
-│     "name": "ТОО Барыс"                          │  ← highlighted, scrolled to
-│  }                                               │
-└──────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│ Came from the API                        copy ⌄    ×  │
+│ "ТОО Барыс"                                           │
+├───────────────────────────────────────────────────────┤
+│ field    items[37].contractor.name                    │
+│ request  GET /api/works?status=active   200   143ms   │
+│ source   src/works/works.row.tsx:12   <td>            │
+├───────────────────────────────────────────────────────┤
+│  Response │ Source │ Tree 4                           │
+├───────────────────────────────────────────────────────┤
+│   34       "contractor": {                            │
+│   35         "name": "ТОО Барыс",                     │ ← marked, scrolled to
+│   36         "bin": "990140000155"                    │
+│   37       },                                         │
+├───────────────────────────────────────────────────────┤
+│ esc close   c copy the answer   1–3 panes   o open    │
+└───────────────────────────────────────────────────────┘
 ```
 
-Four things at once: the chain, the whole tree that rendered it, the source
-around the line, and the response body scrolled to the exact field. Every frame
-of the tree is a link — the answer you want is often not the innermost
-component but the column definition two frames out. Escape closes the panel.
-The same chain also goes to the console, where the body is logged as a real
-object for the inspector to browse.
+**The first line is the answer.** Not the evidence for it — the answer, in the
+words you would use to say whose bug it is. There are four, and only four:
+_came from the API_, _built in the app_, _n fields hold this value_, and
+_nothing recorded yet_, which is about this tool rather than your value and says
+so. Under it, the three facts behind it: which field, which call, which line.
+
+Then the evidence, one pane at a time and each with room to be read — the
+response scrolled to the exact field, the source around the line that rendered
+it, and the whole tree that got it there. Every file in the tree opens in your
+editor, because the answer you want is often not the innermost component but the
+column definition two frames out.
+
+The same answer goes to the console, where the body is logged as a real object
+for the inspector to browse.
 
 The Network tab does not come into it.
 
@@ -65,13 +72,27 @@ responses it reads will not be recorded.
 
 ## Use
 
-**Hold alt** and move the pointer. Whatever is under it is outlined and a single
-line says where it came from — enough to read a whole table by moving across it,
-which is the thing a click per cell makes unbearable. Let alt go and it is gone.
+**Hold alt** and move the pointer. Whatever is under it is outlined, and two
+lines say which field it came from and which call brought it — enough to read a
+whole table by moving across it, which is the thing a click per cell makes
+unbearable. Let alt go and it is gone.
 
-**Alt-click** for the whole answer. The panel opens beside the click, not in a
-corner on top of the next thing you wanted to read. Drag it by its header,
-**copy** puts the chain on the clipboard for a ticket, Escape closes it.
+**Or press ⇧⌥C** (`shift+alt+C`) to stay in it. Reading a table takes a minute of
+moving, and a minute is a long time to hold a modifier that also opens your
+browser's menu bar and is dropped the moment focus goes elsewhere. In the mode
+there is nothing to hold: point, and click when you want the panel. A badge says
+you are in it and `esc` gets you out — of the mode and the panel at once.
+
+**Click** for the whole answer, beside the click rather than in a corner on top
+of the next thing you wanted to read. Drag it by its header. `1`–`4` move between
+panes, `o` opens the source in your editor, `esc` closes.
+
+**copy** is a menu of the four things worth copying, each saying which it is: the
+whole answer for a ticket, the field path, the request URL, and the call as
+`curl`. The `curl` carries the headers your app sent, which is the difference
+between a command the person on the other end of the ticket can run and one that
+answers 401 — cookies excepted, because a browser attaches those after
+JavaScript is finished with the request and never lets it read them back.
 
 Or from the console, on whatever is selected in the elements panel — which
 opens the panel beside that element as well as returning the answer:
@@ -85,9 +106,8 @@ interface Provenance {
 	value: unknown; // 42, not "42", if that is what the response held
 	path?: string; // items[37].contractor.name — only when it is the only one
 	ambiguous?: string[]; // every candidate, when it is not
-	request?: RequestMeta; // method, url, status, duration
+	request?: RequestMeta; // method, url, status, duration, headers as sent
 	response?: unknown; // the recorded body, ready to inspect
-	hops: Hop[]; // the chain, nearest step first
 	tree: Frame[]; // who rendered it, outermost first, with file and line
 	broken: boolean; // honest when the trail runs out
 }
@@ -101,8 +121,26 @@ objects — cannot be traced any further, and `camefrom` says so:
 
 ```
 camefrom "1 250,00 ₸"
-  ← <InvoiceTotal> · src/invoice.tsx:88
-  ✗ not read from any recorded response
+Built in the app
+None of the 12 responses camefrom recorded holds this text, so something on the
+way to the screen made it — a template, a number format, a .map() into new
+objects.
+
+rendered by
+  <InvoiceTotal>  src/invoice.tsx:88
+```
+
+The count is not decoration. A value missing from twelve recorded responses is a
+fact about the value; the same value missing from none is a fact about whether
+this tool is running at all, and the two read identically until the number is
+said out loud. So the second one is a different answer, in the panel and here:
+
+```
+camefrom "—"
+Nothing recorded yet
+camefrom has not seen a single response. If the page already loaded its data,
+install() ran too late — it has to come before anything that patches fetch or
+XMLHttpRequest.
 ```
 
 A tool that answers confidently and wrongly is worse than no tool. The same
@@ -128,10 +166,16 @@ them, not the first:
 
 ```
 camefrom "Alpyspayev Bakhtiyar"
-  ← 2 fields hold this value
-      ? data[0].full_name
-      ? data[1].full_name
+2 fields hold this value
+Nothing around the click narrowed it down. Pick one to mark it in the response.
+
+fields   data[0].full_name
+         data[1].full_name
 ```
+
+In the panel they are a list to pick from, and picking one marks it in the
+response body — because which of the two it is is a thing you know and this tool
+does not.
 
 ## Works with
 
@@ -159,8 +203,9 @@ its `data-tsd-source` attributes fill in anything React left out.
 
 ## Not yet
 
-- Intermediate transforms are not named — the chain jumps from the read to the
-  component that rendered it.
+- Intermediate transforms are not named. When the answer is _built in the app_,
+  it is the line that rendered the value, not the `.map()` or the formatter
+  between the response and it.
 - **React records the position of the first 10 000 elements only.** The counter
   is never reset, so a page that has been open for a while, or a table that has
   re-rendered a few hundred times, has spent it — and every element made after
