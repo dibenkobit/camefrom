@@ -179,6 +179,29 @@ describe("before alt is held", () => {
 	});
 });
 
+describe("the palette", () => {
+	/**
+	 * The one thing the hint cannot check by looking at its own markup: the tokens
+	 * are declared in `tokens.css` on `:host`, and the label that draws with them
+	 * sits two levels inside the shadow tree. Nothing about that crossing shows up
+	 * in the DOM — an import left behind, or a `:host` that stopped matching,
+	 * leaves every `var()` resolving to nothing and the label drawing on whatever
+	 * the page has underneath, with the whole suite still green.
+	 */
+	test("crosses the shadow boundary to the box that draws with it", () => {
+		seed({ items: [{ contractor: { name: "ТОО Барыс" } }] });
+		hover(render("<div>ТОО Барыс</div>"));
+
+		const line = root()?.querySelector(".line");
+		const drawn = window.getComputedStyle(
+			line as never,
+		) as unknown as CSSStyleDeclaration;
+
+		expect(drawn.backgroundColor).toBe("#ffffff");
+		expect(drawn.color).toBe("#1a1a1a");
+	});
+});
+
 describe("the line of answer", () => {
 	test("names the value, the field and the response", () => {
 		seed({ items: [{ contractor: { name: "ТОО Барыс" } }] });

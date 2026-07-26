@@ -183,6 +183,26 @@ describe("show", () => {
 	});
 });
 
+describe("the palette", () => {
+	/**
+	 * The one thing the panel cannot check by looking at its own markup: the
+	 * tokens are declared in `tokens.css` on `:host`, and everything that draws
+	 * with them is inside the shadow tree. Nothing about that crossing shows up
+	 * in the DOM — an import left behind, or a `:host` that stopped matching,
+	 * leaves every `var()` resolving to nothing and the panel drawing on whatever
+	 * the page has underneath, with the whole suite still green.
+	 */
+	test("crosses the shadow boundary to the box that draws with it", () => {
+		show(traced());
+		const drawn = window.getComputedStyle(
+			panel() as never,
+		) as unknown as CSSStyleDeclaration;
+
+		expect(drawn.backgroundColor).toBe("#ffffff");
+		expect(drawn.color).toBe("#1a1a1a");
+	});
+});
+
 describe("dragging by the header", () => {
 	test("takes over the position from the pointer", () => {
 		show(traced());

@@ -2,8 +2,10 @@ import { revision } from "../capture/store";
 import { elementOf } from "../shared/dom";
 import type { Provenance } from "../shared/types";
 import { resolve } from "../trace/resolve";
+import rules from "./hint.css" with { type: "text" };
 import { nodeAt, ours, own } from "./pointer";
 import { title } from "./report";
+import tokens from "./tokens.css" with { type: "text" };
 
 /** How far the label keeps away from the pointer, in px. */
 const AWAY = 14;
@@ -11,68 +13,8 @@ const AWAY = 14;
 /** Said out loud rather than left blank: see the note on `Summary.field`. */
 const BROKEN = "✗ not from a recorded response";
 
-/**
- * The panel's tokens, on purpose: the two are one tool and should look like it.
- *
- * `--wash` is the one addition — the tint inside the outline — and it is spelled
- * out per scheme instead of derived from `--link`, so nothing here depends on
- * relative colour syntax being available.
- */
-const STYLE = `
-:host { all: initial; pointer-events: none; }
-.hint {
-    --bg: #ffffff;
-    --fg: #1a1a1a;
-    --dim: #6b6b6b;
-    --edge: #e2e2e2;
-    --link: #0a58ca;
-    --warn: #b3450b;
-    --wash: rgb(10 88 202 / 0.10);
-}
-@media (prefers-color-scheme: dark) {
-    .hint {
-        --bg: #17181a;
-        --fg: #ededed;
-        --dim: #8f9094;
-        --edge: #2c2e31;
-        --link: #7aa2f7;
-        --warn: #e0a35e;
-        --wash: rgb(122 162 247 / 0.16);
-    }
-}
-[hidden] { display: none; }
-.box {
-    position: fixed;
-    z-index: 2147483646;
-    background: var(--wash);
-    /* An outline rather than a border: it is drawn outside the box, so the ring
-       never sits on top of the text it is pointing at. */
-    outline: 1px solid var(--link);
-    border-radius: 2px;
-}
-.line {
-    position: fixed;
-    z-index: 2147483646;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 6px;
-    max-width: min(520px, calc(100vw - 24px));
-    padding: 3px 7px;
-    border: 1px solid var(--edge);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--fg);
-    box-shadow: 0 4px 14px rgb(0 0 0 / 0.22);
-    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-.line > span { overflow-wrap: anywhere; min-width: 0; }
-.value { font-weight: 600; }
-.source, .where { color: var(--dim); }
-.broken { color: var(--warn); }
-.field::before, .source::before { content: "← "; color: var(--dim); }
-.field.broken::before { content: none; }
-`;
+/** The shared palette, then the rules that draw with it. */
+const STYLE = tokens + rules;
 
 /** One line of answer, in the pieces the hint colours differently. */
 export interface Summary {

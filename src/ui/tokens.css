@@ -1,0 +1,40 @@
+/*
+ * The palette, one set for the whole tool.
+ *
+ * Declared on `:host` rather than on the box that draws with it, which is what
+ * lets the panel and the hint take the same file: custom properties inherit into
+ * a shadow tree from its host, and `all: initial` — where both roots start — is
+ * defined not to reset them.
+ *
+ * Both roots take the whole palette, though `--mark` is only ever read by the
+ * panel and `--wash` only by the hint. Keeping those two anywhere else would mean
+ * a second dark-scheme block per file to hold them, which is the shape this file
+ * exists to undo: the seven they share were spelled out twice, and stayed in step
+ * only for as long as nobody forgot the other copy.
+ *
+ * `--wash` — the tint inside the hint's outline — is spelled out per scheme
+ * rather than derived from `--link`, so nothing here depends on relative colour
+ * syntax being available.
+ */
+:host {
+	--bg: #ffffff;
+	--fg: #1a1a1a;
+	--dim: #6b6b6b;
+	--edge: #e2e2e2;
+	--link: #0a58ca;
+	--warn: #b3450b;
+	--mark: #fff3ba;
+	--wash: rgb(10 88 202 / 0.1);
+}
+@media (prefers-color-scheme: dark) {
+	:host {
+		--bg: #17181a;
+		--fg: #ededed;
+		--dim: #8f9094;
+		--edge: #2c2e31;
+		--link: #7aa2f7;
+		--warn: #e0a35e;
+		--mark: #3b3520;
+		--wash: rgb(122 162 247 / 0.16);
+	}
+}

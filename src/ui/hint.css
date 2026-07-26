@@ -1,0 +1,58 @@
+:host {
+	all: initial;
+	pointer-events: none;
+}
+[hidden] {
+	display: none;
+}
+.box {
+	position: fixed;
+	z-index: 2147483646;
+	background: var(--wash);
+	/* An outline rather than a border: it is drawn outside the box, so the ring
+	   never sits on top of the text it is pointing at. */
+	outline: 1px solid var(--link);
+	border-radius: 2px;
+}
+.line {
+	position: fixed;
+	z-index: 2147483646;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 6px;
+	max-width: min(520px, calc(100vw - 24px));
+	padding: 3px 7px;
+	border: 1px solid var(--edge);
+	border-radius: 6px;
+	background: var(--bg);
+	color: var(--fg);
+	box-shadow: 0 4px 14px rgb(0 0 0 / 0.22);
+	font:
+		12px / 1.45 ui-monospace,
+		SFMono-Regular,
+		Menlo,
+		monospace;
+}
+.line > span {
+	overflow-wrap: anywhere;
+	min-width: 0;
+}
+.value {
+	font-weight: 600;
+}
+.source,
+.where {
+	color: var(--dim);
+}
+.broken {
+	color: var(--warn);
+}
+.field::before,
+.source::before {
+	content: "← ";
+	color: var(--dim);
+}
+.field.broken::before {
+	content: none;
+}
