@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import type { Frame } from "../shared/types";
 import { innermost } from "./fiber";
-import type { Frame } from "./types";
 
 function frame(name: string, file?: string, line = 10): Frame {
 	return {

@@ -1,6 +1,6 @@
+import type { RequestMeta } from "../shared/types";
 import { findResponse, recordResponse } from "./store";
 import { taint } from "./taint";
-import type { RequestMeta } from "./types";
 
 /**
  * A body we have seen as text but not yet as data.

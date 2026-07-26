@@ -1,4 +1,4 @@
-import type { Position } from "./types";
+import type { Position } from "../shared/types";
 
 /**
  * Where a piece of JSX is written, read out of the stack React captured there.

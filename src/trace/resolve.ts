@@ -1,17 +1,9 @@
-import {
-	attributeOf,
-	elementOf,
-	type Fiber,
-	nearestFiber,
-	treeOf,
-} from "./fiber";
+import { findReads, findResponse } from "../capture/store";
+import { attributeOf, type Fiber, nearestFiber, treeOf } from "../react/fiber";
+import { ELEMENT_NODE, elementOf, TEXT_NODE } from "../shared/dom";
+import { joinPath, within } from "../shared/path";
+import type { Frame, Hop, Provenance } from "../shared/types";
 import { entriesOf, isRecordLike, pathsOf, place } from "./match";
-import { joinPath, within } from "./path";
-import { findReads, findResponse } from "./store";
-import type { Frame, Hop, Provenance } from "./types";
-
-const ELEMENT_NODE = 1;
-const TEXT_NODE = 3;
 
 /** How far up we look for the object a component was handed. */
 const MAX_FIBERS = 40;

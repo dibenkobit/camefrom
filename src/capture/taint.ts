@@ -1,4 +1,4 @@
-import { childPath } from "./path";
+import { childPath } from "../shared/path";
 import { recordRead } from "./store";
 
 export interface Origin {

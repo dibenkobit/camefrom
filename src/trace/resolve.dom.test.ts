@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
+import { recordResponse, reset } from "../capture/store";
+import { taint } from "../capture/taint";
 import { resolve, textOf } from "./resolve";
-import { recordResponse, reset } from "./store";
-import { taint } from "./taint";
 
 const window = new Window({ url: "http://localhost" });
 // happy-dom nodes are structurally what resolve() needs; it only ever touches

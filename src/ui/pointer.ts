@@ -7,7 +7,7 @@
  * neither of those can import back.
  */
 
-const ELEMENT_NODE = 1;
+import { ELEMENT_NODE } from "../shared/dom";
 
 /** What marks a host of ours. The value says which one, for whoever inspects it. */
 const MARK = "data-camefrom";

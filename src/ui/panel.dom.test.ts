@@ -1,9 +1,9 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
+import type { Provenance } from "../shared/types";
 import { beside, hide, show, within } from "./panel";
 import { ours } from "./pointer";
 import { format } from "./report";
-import type { Provenance } from "./types";
 
 const window = new Window({ url: "http://localhost" });
 

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { recordResponse, reset } from "../capture/store";
+import { taint } from "../capture/taint";
 import { traceText } from "./resolve";
-import { recordResponse, reset } from "./store";
-import { taint } from "./taint";
 
 const meta = {
 	method: "GET",

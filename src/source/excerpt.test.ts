@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { around, closesAt, extract } from "./source";
+import { around, closesAt, extract } from "./excerpt";
 
 describe("extract", () => {
 	test("reads the file out of a Vite ?raw module", () => {

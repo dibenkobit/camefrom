@@ -1,10 +1,10 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
+import { recordResponse, reset } from "../capture/store";
+import { taint } from "../capture/taint";
+import type { Provenance } from "../shared/types";
 import { hide, summarize, watch } from "./hint";
 import { own } from "./pointer";
-import { recordResponse, reset } from "./store";
-import { taint } from "./taint";
-import type { Provenance } from "./types";
 
 const window = new Window({ url: "http://localhost" });
 const document = window.document as unknown as Document;

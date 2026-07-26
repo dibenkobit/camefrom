@@ -1,5 +1,5 @@
-import { locate } from "./sourcemap";
-import type { Frame, Provenance } from "./types";
+import type { Frame, Provenance } from "../shared/types";
+import { locate } from "../source/sourcemap";
 
 /** Candidates worth reading one by one before a count says more. */
 const MAX_LISTED = 6;

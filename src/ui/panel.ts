@@ -1,10 +1,10 @@
-import { innermost } from "./fiber";
+import { innermost } from "../react/fiber";
+import type { Frame, Position, Provenance } from "../shared/types";
+import { type Excerpt, excerptOf } from "../source/excerpt";
+import { written } from "../source/sourcemap";
 import { type PrintedJson, print } from "./json";
 import { own } from "./pointer";
 import { format, title } from "./report";
-import { type Excerpt, excerptOf } from "./source";
-import { written } from "./sourcemap";
-import type { Frame, Position, Provenance } from "./types";
 
 const STYLE = `
 :host { all: initial; }

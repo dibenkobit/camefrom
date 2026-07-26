@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import type { Provenance } from "../shared/types";
 import { format } from "./report";
-import type { Provenance } from "./types";
 
 const traced: Provenance = {
 	value: "ТОО Барыс",

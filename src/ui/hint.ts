@@ -1,10 +1,9 @@
+import { revision } from "../capture/store";
+import { elementOf } from "../shared/dom";
+import type { Provenance } from "../shared/types";
+import { resolve } from "../trace/resolve";
 import { nodeAt, ours, own } from "./pointer";
 import { title } from "./report";
-import { resolve } from "./resolve";
-import { revision } from "./store";
-import type { Provenance } from "./types";
-
-const ELEMENT_NODE = 1;
 
 /** How far the label keeps away from the pointer, in px. */
 const AWAY = 14;
@@ -122,12 +121,6 @@ const answers = new WeakMap<
 	Node,
 	{ at: number; provenance: Provenance | null }
 >();
-
-function elementOf(node: Node): Element | null {
-	return node.nodeType === ELEMENT_NODE
-		? (node as Element)
-		: node.parentElement;
-}
 
 /**
  * The answer for a node, resolved at most once per node per revision.

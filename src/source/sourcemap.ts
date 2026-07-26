@@ -11,7 +11,7 @@
  * guesses: no map, no position.
  */
 
-import type { Frame, Position } from "./types";
+import type { Frame, Position } from "../shared/types";
 
 const DIGITS =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

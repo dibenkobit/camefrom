@@ -1,5 +1,6 @@
+import { elementOf } from "../shared/dom";
+import type { Frame, Position } from "../shared/types";
 import { callSite, untracked } from "./stack";
-import type { Frame, Position } from "./types";
 
 /**
  * What React leaves lying around in a development build, and how to read it.
@@ -10,8 +11,6 @@ import type { Frame, Position } from "./types";
  * install a plugin — and a dev tool that needs a build step is a dev tool that
  * does not get used.
  */
-
-const ELEMENT_NODE = 1;
 
 /** How far up a tree we will walk. Deep enough for any real app. */
 const MAX_FRAMES = 24;
@@ -35,12 +34,6 @@ export interface Fiber {
 	};
 	/** The fiber whose render created this element. Present in development. */
 	_debugOwner?: Fiber | null;
-}
-
-export function elementOf(node: Node): Element | null {
-	return node.nodeType === ELEMENT_NODE
-		? (node as Element)
-		: node.parentElement;
 }
 
 function fiberOf(element: Element): Fiber | undefined {

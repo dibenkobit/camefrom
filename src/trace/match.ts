@@ -1,6 +1,6 @@
-import { childPath } from "./path";
-import { type RecordedResponse, recorded, revision } from "./store";
-import { originOf } from "./taint";
+import { type RecordedResponse, recorded, revision } from "../capture/store";
+import { originOf } from "../capture/taint";
+import { childPath } from "../shared/path";
 
 /**
  * Placing an object the app is holding back inside a response body.

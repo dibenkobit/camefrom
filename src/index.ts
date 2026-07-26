@@ -1,7 +1,13 @@
 import * as devtools from "./devtools";
-import type { Provenance } from "./types";
+import type { Provenance } from "./shared/types";
 
-export type { Frame, Hop, Position, Provenance, RequestMeta } from "./types";
+export type {
+	Frame,
+	Hop,
+	Position,
+	Provenance,
+	RequestMeta,
+} from "./shared/types";
 
 /**
  * Whether this build is allowed to trace anything.

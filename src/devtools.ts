@@ -1,12 +1,11 @@
-import { hide as hideHint, watch as watchHint } from "./hint";
-import { intercept } from "./intercept";
-import { type Point, show } from "./panel";
-import { nodeAt, ours } from "./pointer";
-import { report } from "./report";
-import { resolve } from "./resolve";
-import type { Provenance } from "./types";
-
-const ELEMENT_NODE = 1;
+import { intercept } from "./capture/intercept";
+import { elementOf } from "./shared/dom";
+import type { Provenance } from "./shared/types";
+import { resolve } from "./trace/resolve";
+import { hide as hideHint, watch as watchHint } from "./ui/hint";
+import { type Point, show } from "./ui/panel";
+import { nodeAt, ours } from "./ui/pointer";
+import { report } from "./ui/report";
 
 let installed = false;
 
@@ -19,12 +18,7 @@ let installed = false;
  * the panel is better off in its corner than at the top of the page.
  */
 function anchorOf(target: Node): Point | undefined {
-	const element =
-		target.nodeType === ELEMENT_NODE
-			? (target as Element)
-			: target.parentElement;
-
-	const box = element?.getBoundingClientRect();
+	const box = elementOf(target)?.getBoundingClientRect();
 	if (!box || (box.width === 0 && box.height === 0)) return undefined;
 	return { x: box.left, y: box.bottom };
 }

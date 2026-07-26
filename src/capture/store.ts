@@ -1,4 +1,4 @@
-import type { RequestMeta } from "./types";
+import type { RequestMeta } from "../shared/types";
 
 /** Responses kept for inspection. Older ones fall off the end. */
 const MAX_RESPONSES = 50;
