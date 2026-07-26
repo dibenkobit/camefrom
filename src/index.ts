@@ -1,5 +1,7 @@
+import { hide as hideHint, watch as watchHint } from "./hint";
 import { intercept } from "./intercept";
 import { type Point, show } from "./panel";
+import { nodeAt } from "./pointer";
 import { report } from "./report";
 import { resolve } from "./resolve";
 import type { Provenance } from "./types";
@@ -9,26 +11,6 @@ export type { Frame, Hop, Position, Provenance, RequestMeta } from "./types";
 const ELEMENT_NODE = 1;
 
 let installed = false;
-
-/**
- * The node under the pointer, down to the individual text node.
- *
- * `event.target` would only ever name the element, which is not enough when a
- * cell holds several pieces of text and only one of them was pointed at.
- */
-function nodeAt(event: MouseEvent): Node | null {
-	const position = document.caretPositionFromPoint?.(
-		event.clientX,
-		event.clientY,
-	);
-	if (position) return position.offsetNode;
-
-	// Safari has never implemented the standard one.
-	const range = document.caretRangeFromPoint?.(event.clientX, event.clientY);
-	if (range) return range.startContainer;
-
-	return event.target as Node | null;
-}
 
 /**
  * Where to open the panel for a node nobody clicked.
@@ -69,6 +51,9 @@ function listen(): void {
 			// nothing should still behave like an ordinary click.
 			event.preventDefault();
 			event.stopPropagation();
+			// The panel is about to say all of this properly, and two answers on
+			// screen at once is one too many.
+			hideHint();
 			// Beside the click: the answer belongs next to the thing asked about,
 			// not in the corner where the panel used to cover the next cell.
 			show(found, { x: event.clientX, y: event.clientY });
@@ -78,10 +63,14 @@ function listen(): void {
 		true,
 	);
 
+	// The cheap preview: one line of answer under the pointer for as long as alt
+	// is held, so reading a table is a movement rather than a click per cell.
+	watchHint();
+
 	// Says the tool is alive and how to use it, which is the difference between
 	// "nothing happened" being a bug report and being a question.
 	console.log(
-		"%ccamefrom%c alt-click any text to see where it came from",
+		"%ccamefrom%c hold alt over any text to trace it, alt-click for the panel",
 		"font-weight:bold",
 		"font-weight:normal",
 	);

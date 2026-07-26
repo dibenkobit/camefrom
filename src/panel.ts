@@ -135,7 +135,14 @@ function element<K extends keyof HTMLElementTagNameMap>(
 }
 
 function mount(): ShadowRoot {
-	if (shadow) return shadow;
+	if (shadow) {
+		// An app that replaces the whole body takes the host with it, and a panel
+		// that appends into a detached shadow root cannot be told apart from a
+		// tool that never loaded. Putting it back costs one property read.
+		const host = shadow.host;
+		if (!host.isConnected) document.body.append(host);
+		return shadow;
+	}
 
 	const host = element("div");
 	host.style.setProperty("all", "initial");

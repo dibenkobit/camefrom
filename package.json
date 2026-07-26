@@ -1,7 +1,7 @@
 {
 	"name": "camefrom",
 	"version": "0.1.0",
-	"description": "Alt-click any text in your React app to see where it came from: the API response field, the component and the source line. Works with fetch, XHR and axios.",
+	"description": "Hold alt over any text in your React app to see where it came from: the API response field, the render tree and the source line. Works with fetch, XHR and axios.",
 	"keywords": [
 		"react",
 		"devtools",

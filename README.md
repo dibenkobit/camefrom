@@ -10,7 +10,8 @@ find the component, find the prop, walk up to the hook, work out which request
 fed it, open the Network tab, expand the JSON, compare by eye. A minute and a
 half. Dozens of times a day.
 
-Alt-click it instead, and a panel answers:
+Hold alt and the answer follows the pointer, a line at a time. Alt-click and a
+panel answers in full:
 
 ```
 ┌ "ТОО Барыс"                                    ✕ ┐
@@ -58,7 +59,11 @@ client. In production builds the package resolves to a no-op through the
 
 ## Use
 
-**Alt-click** any text in the page. The panel opens beside the click, not in a
+**Hold alt** and move the pointer. Whatever is under it is outlined and a single
+line says where it came from — enough to read a whole table by moving across it,
+which is the thing a click per cell makes unbearable. Let alt go and it is gone.
+
+**Alt-click** for the whole answer. The panel opens beside the click, not in a
 corner on top of the next thing you wanted to read. Drag it by its header,
 **copy** puts the chain on the clipboard for a ticket, Escape closes it.
 
