@@ -40,7 +40,8 @@
     },
     "files": [
         "dist",
-        "src"
+        "src",
+        "!src/**/*.test.ts"
     ],
     "scripts": {
         "build": "bun run build:js && bun run build:types",
