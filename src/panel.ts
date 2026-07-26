@@ -157,6 +157,11 @@ const STYLE = `
     overflow: auto;
     color: var(--dim);
 }
+/* Every section that scrolls keeps the gesture to itself. Without this a wheel
+   that reaches the end of the response body carries on into the page behind —
+   the panel stops moving and the table under it starts, which reads as the panel
+   never having taken the scroll at all. */
+.value, .chain, .tree, .code, .body { overscroll-behavior: contain; }
 `;
 
 /** Candidate fields worth a row of their own before a count says more. */

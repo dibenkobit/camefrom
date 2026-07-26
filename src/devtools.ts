@@ -65,6 +65,24 @@ function listen(): void {
 		true,
 	);
 
+	// A wheel over the panel is the panel scrolling, and no business of the app's.
+	// Apps scroll themselves on wheel more often than one would think — a
+	// virtualised table, a smooth-scroll wrapper — and a listener of theirs on the
+	// document sees every wheel over our panel too, then moves the page while the
+	// panel under the pointer sits still.
+	//
+	// On the window and captured, which is as early as a listener gets, and
+	// `install()` is documented to run before the app's own. Propagation only:
+	// what scrolls the box under the pointer is the default action, and that is
+	// left alone.
+	window.addEventListener(
+		"wheel",
+		(event) => {
+			if (ours(event)) event.stopPropagation();
+		},
+		{ capture: true, passive: true },
+	);
+
 	// The cheap preview: one line of answer under the pointer for as long as alt
 	// is held, so reading a table is a movement rather than a click per cell.
 	watchHint();
