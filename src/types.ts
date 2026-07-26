@@ -13,6 +13,13 @@ export interface Position {
 	file: string;
 	line: number;
 	column: number;
+	/**
+	 * The URL of the module this position is really inside, when it came off a
+	 * stack trace and therefore describes a bundler's output rather than the file
+	 * anybody wrote. Set means the line has to be mapped back before it is shown;
+	 * the module's own source map is what does that.
+	 */
+	bundle?: string;
 }
 
 /** One step of the chain, rendered as one line in the panel. */
@@ -34,6 +41,13 @@ export interface Frame {
 	name: string;
 	/** Where its JSX is written, when React or an inspector recorded it. */
 	at?: Position;
+	/**
+	 * Set when React had already stopped recording positions by the time this
+	 * element was created — it keeps the call site of the first ten thousand and
+	 * nothing after. Tells a position we failed to read apart from one that was
+	 * never written down, which is the difference between a bug and a reload.
+	 */
+	untracked?: boolean;
 	/** The innermost frame: the one that rendered the text you pointed at. */
 	target: boolean;
 }

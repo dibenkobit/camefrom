@@ -125,7 +125,16 @@ Any bundler — Vite, Next.js, webpack, Rspack — because the runtime needs no
 build step. The render tree and its file and line numbers come from React
 itself: React 19 captures the call site of every element it creates, and
 React 16 to 18 carry whatever the Babel transform recorded. No plugin to
-install. If a source inspector such as
+install.
+
+A call site React captured is a position in the module your bundler built, not
+in the file you wrote — under a Vite dev server those differ by a couple of
+lines near the top of a file and half a dozen further down, which is how a
+line number ends up naming a closing brace. Every position is mapped back
+through the module's own source map before it is shown, and the excerpt comes
+out of that map too, so it no longer takes a dev server that answers `?raw`.
+Where there is no map there is no line: the frame is listed without one rather
+than with a wrong one. If a source inspector such as
 [TanStack Devtools](https://tanstack.com/devtools) is already in the project,
 its `data-tsd-source` attributes fill in anything React left out.
 
@@ -133,11 +142,18 @@ its `data-tsd-source` attributes fill in anything React left out.
 
 - Intermediate transforms are not named — the chain jumps from the read to the
   component that rendered it.
-- A frame can come back without a position. An engine is free to inline a
-  function whose whole body is a `return` out of the stack, and React's own
-  owner stacks have the same gap. The frame is still listed, without a link.
-- The source excerpt needs a dev server that answers `?raw`, which today means
-  Vite. Elsewhere the panel simply leaves that part out.
+- **React records the position of the first 10 000 elements only.** The counter
+  is never reset, so a page that has been open for a while, or a table that has
+  re-rendered a few hundred times, has spent it — and every element made after
+  that carries no call site at all. The panel says so and tells you to reload,
+  because that is what brings the positions back. Nothing here can fix it from
+  outside React.
+- A frame can come back without a position for a second reason: an engine is
+  free to inline a function whose whole body is a `return` out of the stack, and
+  React's own owner stacks have the same gap.
+- The excerpt can belong to a frame further out than the one you pointed at,
+  when that one has no position. It is headed with the frame it came from, so
+  it is never mistaken for the line that rendered the value.
 - `XMLHttpRequest` with `responseType: "json"` is invisible: the browser parses
   it internally and never calls `JSON.parse`.
 

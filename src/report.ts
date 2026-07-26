@@ -1,3 +1,4 @@
+import { locate } from "./sourcemap";
 import type { Frame, Provenance } from "./types";
 
 /** Candidates worth reading one by one before a count says more. */
@@ -46,6 +47,14 @@ export function format(provenance: Provenance): string[] {
 		provenance.tree.forEach((entry, depth) => {
 			lines.push(frame(entry, depth));
 		});
+
+		// Why the frame that was pointed at carries no line. Left unsaid it reads
+		// as the tool having failed, rather than as something a reload fixes.
+		if (provenance.tree.at(-1)?.untracked) {
+			lines.push(
+				"  ! React records the position of the first 10 000 elements only; reload to get them back",
+			);
+		}
 	}
 
 	if (provenance.broken) {
@@ -64,9 +73,15 @@ export function format(provenance: Provenance): string[] {
  * panel at all.
  */
 export function report(provenance: Provenance): void {
-	console.group(`camefrom ${title(provenance.value)}`);
-	for (const line of format(provenance)) console.log(line);
-	if (provenance.response !== undefined)
-		console.log("response", provenance.response);
-	console.groupEnd();
+	// Positions come off a stack trace, which describes the module a bundler
+	// built. Printing them unmapped would put a line number in a ticket that
+	// names a closing brace in the reader's editor. The map is a request, hence
+	// the wait; the panel is already on screen by then.
+	void locate(provenance.tree).then((tree) => {
+		console.group(`camefrom ${title(provenance.value)}`);
+		for (const line of format({ ...provenance, tree })) console.log(line);
+		if (provenance.response !== undefined)
+			console.log("response", provenance.response);
+		console.groupEnd();
+	});
 }

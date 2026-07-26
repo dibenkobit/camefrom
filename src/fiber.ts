@@ -1,4 +1,4 @@
-import { callSite } from "./stack";
+import { callSite, untracked } from "./stack";
 import type { Frame, Position } from "./types";
 
 /**
@@ -101,8 +101,25 @@ function positionOf(fiber: Fiber): Position | undefined {
 
 	// Duck-typed rather than `instanceof Error`: an app with two realms — an
 	// iframe, a portal into one — throws Errors that fail the check.
-	const stack = (fiber._debugStack as { stack?: unknown } | undefined)?.stack;
+	const stack = stackOf(fiber);
 	return typeof stack === "string" ? callSite(stack) : undefined;
+}
+
+function stackOf(fiber: Fiber): unknown {
+	return (fiber._debugStack as { stack?: unknown } | undefined)?.stack;
+}
+
+/**
+ * Whether React was still recording positions when this element was made.
+ *
+ * True when there is nothing to blame — no stack at all means a build without
+ * React's debug fields, not a budget that ran out, and saying otherwise would
+ * send somebody reloading for no reason.
+ */
+function recorded(fiber: Fiber): boolean {
+	if (fiber._debugSource) return true;
+	const stack = stackOf(fiber);
+	return typeof stack === "string" ? !untracked(stack) : true;
 }
 
 /** What an inspector wrote on the DOM, for when React recorded nothing. */
@@ -166,16 +183,30 @@ export function treeOf(fiber: Fiber | undefined): Frame[] {
 		// authorship, and they crowd out the components worth reading.
 		if (frames.length > 0 && typeof current.type === "string") continue;
 
-		frames.push({ name, at: positionOf(current), target: frames.length === 0 });
+		const at = positionOf(current);
+		frames.push({
+			name,
+			at,
+			target: frames.length === 0,
+			...(at || recorded(current) ? {} : { untracked: true }),
+		});
 	}
 	return frames.reverse();
 }
 
-/** The innermost frame we could locate: the closest line to the value. */
-export function innermost(tree: readonly Frame[]): Position | undefined {
+/**
+ * The innermost frame that knows where it is: the closest line to the value.
+ *
+ * The frame itself rather than its position, because it is often not the frame
+ * that was pointed at — React stops recording positions after ten thousand
+ * elements — and an excerpt from someone else's component has to say whose it
+ * is. Presenting it as the line that rendered the text is how a closing brace
+ * comes to look like the answer.
+ */
+export function innermost(tree: readonly Frame[]): Frame | undefined {
 	for (let index = tree.length - 1; index >= 0; index--) {
-		const at = tree[index]?.at;
-		if (at && at.line > 0) return at;
+		const frame = tree[index];
+		if (frame?.at && frame.at.line > 0) return frame;
 	}
 	return undefined;
 }

@@ -18,6 +18,23 @@ const BOTTOM = "react_stack_bottom_frame";
 /** Frames belonging to React rather than to the app that called it. */
 const REACT = /react[-_]jsx|react\/jsx|react-dom|\/node_modules\/react\//;
 
+/** The placeholder React shares out once it has stopped recording. */
+const UNTRACKED = "UnknownOwner";
+
+/**
+ * Whether React had given up recording positions before this element was made.
+ *
+ * It records the call site of the first ten thousand elements and then hands
+ * every one after that the same placeholder stack. The counter is only ever
+ * incremented — nothing resets it — so in a session of any length most elements
+ * have no position of their own, and a table that re-renders spends the budget
+ * in seconds. Telling this apart from the other kinds of silence is what turns
+ * "the tool is broken" into "reload the page".
+ */
+export function untracked(stack: string): boolean {
+	return stack.includes(UNTRACKED);
+}
+
 /** Turns whatever an engine wrote into a path a dev server can be asked for. */
 export function fileOf(url: string): string | undefined {
 	let path = url;
@@ -62,7 +79,14 @@ function frameOf(line: string): Position | undefined {
 	const file = fileOf(match[1]);
 	return file === undefined
 		? undefined
-		: { file, line: Number(match[2]), column: Number(match[3]) };
+		: {
+				file,
+				line: Number(match[2]),
+				column: Number(match[3]),
+				// The module as loaded, kept whole: the query a dev server hangs off
+				// it is part of the address its source map lives at.
+				bundle: match[1],
+			};
 }
 
 /**

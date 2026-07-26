@@ -1,7 +1,8 @@
 import { innermost } from "./fiber";
 import { type PrintedJson, print } from "./json";
 import { format, title } from "./report";
-import { type Excerpt, excerpt } from "./source";
+import { type Excerpt, excerptOf } from "./source";
+import { written } from "./sourcemap";
 import type { Frame, Position, Provenance } from "./types";
 
 const STYLE = `
@@ -81,6 +82,8 @@ const STYLE = `
 .frame.on .name { color: var(--fg); font-weight: 600; }
 .code { border-top: 1px solid var(--edge); padding: 8px 0; overflow-x: auto; }
 .code:empty { display: none; }
+.origin { padding: 0 12px 6px; color: var(--dim); }
+.note { padding-top: 4px; color: var(--warn); overflow-wrap: anywhere; }
 .line { display: flex; gap: 10px; padding: 0 12px; white-space: pre; }
 .line.on { background: var(--mark); color: var(--fg); }
 .num { min-width: 2.5em; text-align: right; color: var(--dim); user-select: none; }
@@ -99,6 +102,9 @@ const STYLE = `
 
 /** Candidate fields worth a row of their own before a count says more. */
 const MAX_CHOICES = 12;
+/** Why the frame that was pointed at has no line, and what to do about it. */
+const UNTRACKED =
+	"React records the position of the first 10 000 elements only · reload the page to get them back";
 /** How far the panel keeps clear of the point it was opened at. */
 const GAP = 14;
 /**
@@ -409,18 +415,37 @@ function treeView(frames: readonly Frame[]): HTMLElement {
 		row.append(element("span", "name", `${"  ".repeat(depth)}<${frame.name}>`));
 
 		const at = frame.at;
-		if (at) {
-			const where = element(
-				"button",
-				"where",
-				at.line > 0 ? `${at.file}:${at.line}` : at.file,
-			);
-			where.addEventListener("click", () => openInEditor(at));
-			row.append(where);
+		if (!at) {
+			tree.append(row);
+			return;
 		}
+
+		// A position off a stack points into the module a bundler built, and the
+		// line it names in the file somebody wrote is a different one. Mapping it
+		// back needs the map, which needs a request, so the row says it is asking.
+		const where = element("button", "where", "…");
+		row.append(where);
 		tree.append(row);
+
+		void written(at).then((original) => {
+			// No map, or nothing mapped: the frame keeps its name and loses the
+			// link. An unmappable line is not a line worth printing.
+			if (!original) {
+				where.remove();
+				return;
+			}
+			where.textContent =
+				original.line > 0 ? `${original.file}:${original.line}` : original.file;
+			where.addEventListener("click", () => openInEditor(original));
+		});
 	});
 
+	// The frame that was pointed at has no line, and never will have one. Saying
+	// why, and what to do about it, is what stops a missing link from reading as
+	// a broken tool.
+	if (frames.at(-1)?.untracked) {
+		tree.append(element("div", "note", UNTRACKED));
+	}
 	return tree;
 }
 
@@ -480,14 +505,22 @@ async function fillCode(
 	provenance: Provenance,
 	mine: number,
 ): Promise<void> {
-	// The innermost frame we could locate: the closest line to the value itself.
-	const at = innermost(provenance.tree);
-	if (!at) return;
+	const frame = innermost(provenance.tree);
+	if (!frame?.at) return;
 
-	const found = await excerpt(at.file, at.line);
+	const where = await written(frame.at);
+	if (!where || mine !== generation) return;
+
+	const found = await excerptOf(where);
 	if (!found || mine !== generation) return;
 
-	code.append(codeOf(found));
+	// Said out loud, because this is regularly not the frame that was pointed
+	// at: an excerpt from a component two frames out, shown as the line that
+	// rendered the text, is a wrong answer wearing the face of a right one.
+	code.append(
+		element("div", "origin", `${where.file}:${where.line} · <${frame.name}>`),
+		codeOf(found),
+	);
 }
 
 /**

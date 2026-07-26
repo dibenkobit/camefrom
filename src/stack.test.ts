@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { callSite, fileOf } from "./stack";
+import { callSite, fileOf, untracked } from "./stack";
 
 /**
  * The stacks below are real, not invented: captured from React 19.2.8 and
@@ -22,16 +22,20 @@ const firefox = [
 ].join("\n");
 
 describe("callSite", () => {
-	test("names the line of the app that wrote the element", () => {
+	test("names the frame of the app that wrote the element", () => {
 		expect(callSite(chrome)).toEqual({
 			file: "/src/works.table-columns.tsx",
 			line: 41,
 			column: 9,
+			// The module as loaded, query and all: a position off a stack is a
+			// position in a bundler's output, and this is where its map lives.
+			bundle:
+				"http://localhost:5173/src/works.table-columns.tsx?t=1753500000000",
 		});
 	});
 
 	test("reads the shape Firefox and Safari write", () => {
-		expect(callSite(firefox)).toEqual({
+		expect(callSite(firefox)).toMatchObject({
 			file: "/src/works.table-columns.tsx",
 			line: 41,
 			column: 9,
@@ -81,6 +85,29 @@ describe("callSite", () => {
 
 	test("an empty stack is not an answer", () => {
 		expect(callSite("")).toBeUndefined();
+	});
+});
+
+describe("untracked", () => {
+	/**
+	 * What React hands out once the budget is spent: one shared stack, created
+	 * through `UnknownOwner` rather than at the element's own call site. Every
+	 * element after the ten thousandth gets this one, and the counter never
+	 * resets, so a long-lived page is mostly this.
+	 */
+	const shared = [
+		"Error: react-stack-top-frame",
+		"    at UnknownOwner (http://localhost:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js:118:14)",
+		"    at Object.react_stack_bottom_frame (http://localhost:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js:311:44)",
+	].join("\n");
+
+	test("recognises the stack React shares once it has stopped recording", () => {
+		expect(untracked(shared)).toBe(true);
+		expect(callSite(shared)).toBeUndefined();
+	});
+
+	test("a real call site is not that", () => {
+		expect(untracked(chrome)).toBe(false);
 	});
 });
 

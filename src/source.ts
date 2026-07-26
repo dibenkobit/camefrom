@@ -1,3 +1,5 @@
+import type { Mapped } from "./sourcemap";
+
 export interface Excerpt {
 	/** Source lines around the target, in order. */
 	lines: string[];
@@ -53,12 +55,17 @@ export function around(source: string, line: number, radius: number): Excerpt {
 	return { lines: all.slice(first - 1, last), first, target: line };
 }
 
-/** The lines around `line` of `file`, or nothing if the server will not say. */
-export async function excerpt(
-	file: string,
-	line: number,
+/**
+ * The lines around a written position.
+ *
+ * A source map usually carries the file it maps, so most of the time there is
+ * nothing to ask anybody for. The `?raw` request is the fallback, and it is why
+ * this used to work under Vite and nowhere else.
+ */
+export async function excerptOf(
+	where: Mapped,
 	radius = 4,
 ): Promise<Excerpt | undefined> {
-	const source = await read(file);
-	return source === undefined ? undefined : around(source, line, radius);
+	const source = where.source ?? (await read(where.file));
+	return source === undefined ? undefined : around(source, where.line, radius);
 }

@@ -271,10 +271,13 @@ describe("the render tree", () => {
 			_debugOwner: null,
 		});
 
+		// Reported as the stack gave it, in the module the browser loaded. What
+		// the panel shows is this mapped back through that module's source map.
 		expect(resolve(cell)?.tree.at(-1)?.at).toEqual({
 			file: "/src/works.tsx",
 			line: 41,
 			column: 9,
+			bundle: "http://localhost/src/works.tsx",
 		});
 	});
 
@@ -358,5 +361,38 @@ describe("source attributes", () => {
 				target: true,
 			},
 		]);
+	});
+});
+
+describe("when React has stopped recording positions", () => {
+	test("the frame says so, instead of simply having no link", () => {
+		const cell = attachFiber(render("<div>Барыс</div>"), {
+			type: "div",
+			// The one stack React shares out after the ten thousandth element.
+			_debugStack: {
+				stack: [
+					"Error: react-stack-top-frame",
+					"    at UnknownOwner (http://localhost/node_modules/react/jsx-dev-runtime.js:118:14)",
+					"    at Object.react_stack_bottom_frame (http://localhost/node_modules/react/jsx-dev-runtime.js:311:44)",
+				].join("\n"),
+			},
+			_debugOwner: null,
+		});
+
+		expect(resolve(cell)?.tree.at(-1)).toEqual({
+			name: "div",
+			at: undefined,
+			untracked: true,
+			target: true,
+		});
+	});
+
+	test("a build without the debug fields is not blamed for it", () => {
+		const cell = attachFiber(render("<div>Барыс</div>"), {
+			type: "div",
+			return: null,
+		});
+
+		expect(resolve(cell)?.tree.at(-1)?.untracked).toBeUndefined();
 	});
 });
