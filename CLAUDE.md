@@ -1,8 +1,3 @@
----
-description: How work is done in this repository.
-alwaysApply: true
----
-
 # Working principles
 
 **Effort is not an argument against something useful.** Never drop a feature
