@@ -2,9 +2,11 @@
 	all: initial;
 	pointer-events: none;
 }
+
 [hidden] {
 	display: none;
 }
+
 .box {
 	position: fixed;
 	z-index: 2147483646;
@@ -14,6 +16,7 @@
 	outline: 1px solid var(--link);
 	border-radius: 2px;
 }
+
 .line {
 	position: fixed;
 	z-index: 2147483646;
@@ -34,25 +37,31 @@
 		Menlo,
 		monospace;
 }
+
 .line > span {
 	overflow-wrap: anywhere;
 	min-width: 0;
 }
+
 .value {
 	font-weight: 600;
 }
+
 .source,
 .where {
 	color: var(--dim);
 }
+
 .broken {
 	color: var(--warn);
 }
+
 .field::before,
 .source::before {
 	content: "← ";
 	color: var(--dim);
 }
+
 .field.broken::before {
 	content: none;
 }

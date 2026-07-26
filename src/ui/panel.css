@@ -1,6 +1,7 @@
 :host {
 	all: initial;
 }
+
 .panel {
 	position: fixed;
 	right: 16px;
@@ -26,6 +27,7 @@
 	   that has no scrollbar to bring it back. */
 	overflow: clip;
 }
+
 /*
  * How the height is divided between the five sections below.
  *
@@ -54,9 +56,11 @@
 	user-select: none;
 	touch-action: none;
 }
+
 .head.dragging {
 	cursor: grabbing;
 }
+
 .value {
 	flex: 1;
 	max-height: min(6vh, 56px);
@@ -64,6 +68,7 @@
 	overflow: auto;
 	overflow-wrap: anywhere;
 }
+
 .act {
 	all: unset;
 	padding: 0 4px;
@@ -72,9 +77,11 @@
 	line-height: 1;
 	white-space: nowrap;
 }
+
 .act:hover {
 	color: var(--fg);
 }
+
 .chain {
 	display: flex;
 	flex: none;
@@ -84,22 +91,27 @@
 	padding: 8px 12px;
 	overflow: auto;
 }
+
 .hop {
 	display: flex;
 	gap: 6px;
 }
+
 .arrow {
 	color: var(--dim);
 }
+
 .where {
 	all: unset;
 	color: var(--link);
 	cursor: pointer;
 	text-decoration: underline;
 }
+
 .broken {
 	color: var(--warn);
 }
+
 .choices {
 	display: flex;
 	flex-direction: column;
@@ -107,16 +119,19 @@
 	gap: 1px;
 	padding-left: 14px;
 }
+
 .choice {
 	all: unset;
 	color: var(--link);
 	cursor: pointer;
 }
+
 .choice:hover,
 .choice.on {
 	background: var(--mark);
 	color: var(--fg);
 }
+
 .tree {
 	flex: none;
 	max-height: min(14vh, 130px);
@@ -124,21 +139,26 @@
 	border-top: 1px solid var(--edge);
 	overflow: auto;
 }
+
 .tree:empty {
 	display: none;
 }
+
 .frame {
 	display: flex;
 	gap: 8px;
 }
+
 .name {
 	color: var(--dim);
 	white-space: pre;
 }
+
 .frame.on .name {
 	color: var(--fg);
 	font-weight: 600;
 }
+
 .code {
 	flex: none;
 	max-height: min(14vh, 130px);
@@ -146,36 +166,44 @@
 	border-top: 1px solid var(--edge);
 	overflow: auto;
 }
+
 .code:empty {
 	display: none;
 }
+
 .origin {
 	padding: 0 12px 6px;
 	color: var(--dim);
 }
+
 .note {
 	padding-top: 4px;
 	color: var(--warn);
 	overflow-wrap: anywhere;
 }
+
 .why {
 	color: var(--warn);
 	opacity: 0.85;
 }
+
 .why.link {
 	all: unset;
 	color: var(--warn);
 	cursor: pointer;
 	text-decoration: underline;
 }
+
 .stack {
 	padding-left: 14px;
 	color: var(--dim);
 	white-space: pre;
 }
+
 .stack[hidden] {
 	display: none;
 }
+
 /* Rows are only ever as wide as the box that scrolls them, which cuts every
    mark off where the viewport happens to end. Sized to the longest line here
    instead, so the rows inside can stretch to it and the mark ends up a block
@@ -184,26 +212,31 @@
 	width: max-content;
 	min-width: 100%;
 }
+
 .line {
 	display: flex;
 	gap: 10px;
 	padding: 0 12px;
 	white-space: pre;
 }
+
 .line.on {
 	background: var(--mark);
 	color: var(--fg);
 }
+
 .num {
 	min-width: 2.5em;
 	text-align: right;
 	color: var(--dim);
 	user-select: none;
 }
+
 .rest {
 	padding: 2px 12px 0;
 	color: var(--dim);
 }
+
 .body {
 	/* Sized to its content like every other section, rather than to a basis of
 	   zero: a section that starts at nothing is a section that never shrinks,
@@ -218,6 +251,7 @@
 	overflow: auto;
 	color: var(--dim);
 }
+
 /* Every section that scrolls keeps the gesture to itself. Without this a wheel
    that reaches the end of the response body carries on into the page behind —
    the panel stops moving and the table under it starts, which reads as the panel
