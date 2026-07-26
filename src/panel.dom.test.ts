@@ -80,6 +80,10 @@ function pointer(
 		new window.PointerEvent(type, {
 			bubbles: true,
 			cancelable: true,
+			// As a real pointer event is: without this one dispatched inside the
+			// panel would stop at the shadow boundary and never reach the document,
+			// which is exactly the listener under test.
+			composed: true,
 			pointerId: 1,
 			button: 0,
 			...where,
@@ -259,6 +263,34 @@ describe("the copy button", () => {
 
 		expect(logged.join("\n")).toContain("items[0].contractor.name");
 		expect(part(".copy").textContent).toBe("see console");
+	});
+});
+
+describe("a press outside the panel", () => {
+	/** Whether the panel is still in the page, without throwing when it is not. */
+	function shown(): boolean {
+		return Boolean(
+			document.body.lastElementChild?.shadowRoot?.querySelector(".panel"),
+		);
+	}
+
+	test("closes it", () => {
+		show(traced());
+
+		pointer("pointerdown", document.body, { clientX: 5, clientY: 5 });
+		expect(shown()).toBe(false);
+	});
+
+	test("leaves it alone when the press lands inside", () => {
+		show(traced());
+
+		// Through the shadow boundary, the way a real press arrives at the document.
+		pointer("pointerdown", part(".body"), { clientX: 40, clientY: 40 });
+		expect(shown()).toBe(true);
+
+		// Dragging by the header is a press too, and must not close what it moves.
+		pointer("pointerdown", part(".head"), { clientX: 40, clientY: 40 });
+		expect(shown()).toBe(true);
 	});
 });
 

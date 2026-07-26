@@ -173,6 +173,19 @@ function mount(): ShadowRoot {
 		if (event.key === "Escape") hide();
 	});
 
+	// A press anywhere else is the reader moving on. On `pointerdown` rather than
+	// `click`, so the alt-click that opens the next panel closes this one first,
+	// and captured, so an app that swallows clicks cannot hold the panel open.
+	document.addEventListener(
+		"pointerdown",
+		(event) => {
+			// The composed path, not the target: a press inside the shadow root is
+			// retargeted to the host on its way out, and the path says so outright.
+			if (!event.composedPath().includes(host)) hide();
+		},
+		true,
+	);
+
 	return shadow;
 }
 
