@@ -81,7 +81,17 @@ const STYLE = `
 .frame { display: flex; gap: 8px; }
 .name { color: var(--dim); white-space: pre; }
 .frame.on .name { color: var(--fg); font-weight: 600; }
-.code { border-top: 1px solid var(--edge); padding: 8px 0; overflow-x: auto; }
+.code {
+    border-top: 1px solid var(--edge);
+    padding: 8px 0;
+    min-height: 0;
+    /* A share of the panel the excerpt cannot exceed, and its own scroll within
+       it. Sections here shrink in proportion to how tall they want to be, so a
+       forty-line excerpt left uncapped squeezes the tree above it down to a row
+       or two — and the tree is what the panel is read for. */
+    max-height: min(40vh, 320px);
+    overflow: auto;
+}
 .code:empty { display: none; }
 .origin { padding: 0 12px 6px; color: var(--dim); }
 .note { padding-top: 4px; color: var(--warn); overflow-wrap: anywhere; }
@@ -97,17 +107,18 @@ const STYLE = `
 .line { display: flex; gap: 10px; padding: 0 12px; white-space: pre; }
 .line.on { background: var(--mark); color: var(--fg); }
 .num { min-width: 2.5em; text-align: right; color: var(--dim); user-select: none; }
+.rest { padding: 2px 12px 0; color: var(--dim); }
 .body {
     flex: 1;
     min-height: 0;
     margin: 0;
-    padding: 8px 12px 12px;
+    /* No padding across: the rows carry their own, so a marked line fills the
+       box edge to edge instead of stopping short of it. */
+    padding: 8px 0 12px;
     border-top: 1px solid var(--edge);
     overflow: auto;
-    white-space: pre;
     color: var(--dim);
 }
-.hit { display: block; background: var(--mark); color: var(--fg); border-radius: 3px; }
 `;
 
 /** Candidate fields worth a row of their own before a count says more. */
@@ -522,19 +533,42 @@ function treeView(frames: readonly Frame[]): HTMLElement {
 	return tree;
 }
 
+/**
+ * One numbered row.
+ *
+ * Shared by the excerpt and the response body so the two read as one thing: a
+ * line the panel is pointing at is numbered and marked the same way whether it
+ * came out of a source file or out of JSON.
+ */
+function lineOf(number: number, text: string, marked: boolean): HTMLElement {
+	const row = element("div", marked ? "line on" : "line");
+	row.append(
+		element("span", "num", String(number)),
+		element("span", undefined, text),
+	);
+	return row;
+}
+
 function codeOf(found: Excerpt): HTMLElement {
 	const rows = element("div", "rows");
 
 	found.lines.forEach((text, index) => {
 		const number = found.first + index;
-		const marked = number >= found.target.from && number <= found.target.to;
-		const row = element("div", marked ? "line on" : "line");
-		row.append(
-			element("span", "num", String(number)),
-			element("span", undefined, text),
+		rows.append(
+			lineOf(
+				number,
+				text,
+				number >= found.target.from && number <= found.target.to,
+			),
 		);
-		rows.append(row);
 	});
+
+	// An element too long to show says where it ends instead. Without this the
+	// mark reaching the last row is the same picture as an element closing on
+	// it, and the excerpt would be passing a cut off as an ending.
+	if (found.closes !== undefined) {
+		rows.append(element("div", "rest", `…runs on to line ${found.closes}`));
+	}
 
 	return rows;
 }
@@ -549,32 +583,25 @@ function printedOf(source: unknown): PrintedJson {
 	return json;
 }
 
-/** Writes the response into `body`, marked and scrolled to `path`. */
+/** Writes the response into `body`, numbered, marked and scrolled to `path`. */
 function fillBody(body: HTMLElement, source: unknown, path?: string): void {
 	const json = printedOf(source);
+	// A line index, as `print` counts them from zero; the number shown is the
+	// human one.
 	const hit = path === undefined ? undefined : json.lineOfPath.get(path);
-	body.textContent = "";
 
-	if (hit === undefined) {
-		body.textContent = json.text;
-		return;
-	}
-
-	// Split around the matched line so it can be marked and scrolled to. The
-	// wrapper is what gives the mark a width to fill, as in the excerpt.
-	const lines = json.text.split("\n");
-	const marked = element("mark", "hit", lines[hit] ?? "");
 	const rows = element("div", "rows");
-	rows.append(
-		document.createTextNode(`${lines.slice(0, hit).join("\n")}\n`),
-		marked,
-		document.createTextNode(`\n${lines.slice(hit + 1).join("\n")}`),
-	);
-	body.append(rows);
-
-	requestAnimationFrame(() => {
-		marked.scrollIntoView({ block: "center" });
+	json.text.split("\n").forEach((text, index) => {
+		rows.append(lineOf(index + 1, text, index === hit));
 	});
+	body.replaceChildren(rows);
+
+	// After the rows are in the document, or there is nothing yet to scroll.
+	if (hit !== undefined) {
+		requestAnimationFrame(() => {
+			rows.children[hit]?.scrollIntoView({ block: "center" });
+		});
+	}
 }
 
 async function fillCode(

@@ -13,6 +13,15 @@ export interface Excerpt {
 	 * two lines below as something else's.
 	 */
 	target: { from: number; to: number };
+	/**
+	 * The line the element closes on, when that is below the last one shown.
+	 *
+	 * Set only when the excerpt was cut short, and it is the whole reason the
+	 * cut can be admitted to: a mark running off the bottom edge of an excerpt
+	 * looks exactly like an element that ends there, and the reader who takes it
+	 * for one goes looking for the rest of their component in the wrong file.
+	 */
+	closes?: number;
 }
 
 /** Enough of a position to cut an excerpt at; the file has already been read. */
@@ -206,18 +215,36 @@ export function closesAt(source: string, at: Place): number {
 	return at.line;
 }
 
-/** Splits an excerpt around a line, clamped to the file. Pure, so it is tested. */
+/**
+ * The most lines an excerpt may carry.
+ *
+ * Room for any element written to be read in one go, and a stop short of the
+ * file a page component's root `<div>` would otherwise drag in whole.
+ */
+const LIMIT = 40;
+
+/**
+ * Splits an excerpt around an element, clamped to the file. Pure, so it is
+ * tested.
+ *
+ * The window is measured from the element rather than from the one line its tag
+ * opens on: a `<Comp>` with its props on four lines of their own closes below
+ * anything a radius around the opening line reaches, and an excerpt that stops
+ * mid-prop list is asking the reader to guess the rest.
+ */
 export function around(source: string, at: Place, radius: number): Excerpt {
 	const all = source.split("\n");
+	const closes = closesAt(source, at);
 	const first = Math.max(1, at.line - radius);
-	const last = Math.min(all.length, at.line + radius);
-	// An element longer than the window keeps the window: the excerpt is there
-	// for context, and the mark simply runs to the bottom of what is shown.
-	const to = Math.min(closesAt(source, at), last);
+	// The same context under the element as over it. The line a tag opens on
+	// says what is being rendered; the one it closes on is what says where that
+	// stops, and the lines after it are what it sits next to.
+	const last = Math.min(all.length, closes + radius, first + LIMIT - 1);
 	return {
 		lines: all.slice(first - 1, last),
 		first,
-		target: { from: at.line, to },
+		target: { from: at.line, to: Math.min(closes, last) },
+		...(closes > last ? { closes } : {}),
 	};
 }
 

@@ -141,8 +141,33 @@ describe("around", () => {
 		expect(around(jsx, { line: 2 }, 4).target).toEqual({ from: 2, to: 4 });
 	});
 
-	test("stops the mark where the excerpt does", () => {
+	test("reaches past the radius for the line the element closes on", () => {
 		const jsx = ["<div>", "  <p>", "    text", "  </p>", "</div>"].join("\n");
-		expect(around(jsx, { line: 2 }, 1).target).toEqual({ from: 2, to: 3 });
+		const found = around(jsx, { line: 2 }, 1);
+		expect(found).toMatchObject({
+			lines: ["<div>", "  <p>", "    text", "  </p>", "</div>"],
+			first: 1,
+			target: { from: 2, to: 4 },
+		});
+		// Nothing was cut, so there is nothing for the panel to admit to.
+		expect(found.closes).toBeUndefined();
+	});
+
+	test("cuts an element too long to show, and says where it ends", () => {
+		const jsx = [
+			"before",
+			"<ul>",
+			...Array.from({ length: 98 }, () => "  <li>item</li>"),
+			"</ul>",
+			"after",
+		].join("\n");
+
+		const found = around(jsx, { line: 2 }, 2);
+		expect(found.lines).toHaveLength(40);
+		expect(found.first).toBe(1);
+		// The mark runs to the bottom of what is shown, and `closes` is what tells
+		// the reader that bottom is the excerpt's and not the element's.
+		expect(found.target).toEqual({ from: 2, to: 40 });
+		expect(found.closes).toBe(101);
 	});
 });

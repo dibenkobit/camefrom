@@ -160,6 +160,27 @@ describe("show", () => {
 		show(traced());
 		expect(part(".value").textContent).toBe('"ТОО Барыс"');
 	});
+
+	test("numbers the response the way it numbers source, and marks the field", () => {
+		show(traced());
+
+		const rows = Array.from(part(".body").querySelectorAll(".line"));
+		expect(rows.map((row) => row.querySelector(".num")?.textContent)).toEqual([
+			"1",
+			"2",
+			"3",
+			"4",
+			"5",
+			"6",
+			"7",
+			"8",
+			"9",
+		]);
+
+		const marked = part(".body .line.on");
+		expect(marked.querySelector(".num")?.textContent).toBe("5");
+		expect(marked.textContent).toContain('"name": "ТОО Барыс"');
+	});
 });
 
 describe("dragging by the header", () => {
