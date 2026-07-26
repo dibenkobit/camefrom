@@ -1,0 +1,57 @@
+{
+    "name": "camefrom",
+    "version": "0.0.0",
+    "description": "Alt-click any text in your React app to see where it came from: the API response field, the component and the source line. Works with fetch, XHR and axios.",
+    "keywords": [
+        "react",
+        "devtools",
+        "debugging",
+        "developer-tools",
+        "dx",
+        "provenance",
+        "data-lineage",
+        "trace",
+        "inspector",
+        "api",
+        "fetch",
+        "xhr",
+        "axios",
+        "vite",
+        "frontend"
+    ],
+    "license": "MIT",
+    "author": "Nikita Snetkov",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/dibenkobit/camefrom.git"
+    },
+    "homepage": "https://github.com/dibenkobit/camefrom#readme",
+    "bugs": {
+        "url": "https://github.com/dibenkobit/camefrom/issues"
+    },
+    "type": "module",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "development": "./dist/index.js",
+            "default": "./dist/noop.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist",
+        "src"
+    ],
+    "scripts": {
+        "build": "bun run build:js && bun run build:types",
+        "build:js": "bun build ./src/index.ts ./src/noop.ts --outdir=dist --target=browser --format=esm --sourcemap=linked --packages=external",
+        "build:types": "tsc -p tsconfig.build.json",
+        "typecheck": "tsc -p tsconfig.json",
+        "test": "bun test",
+        "prepublishOnly": "bun run build"
+    },
+    "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5.9.3"
+    }
+}
