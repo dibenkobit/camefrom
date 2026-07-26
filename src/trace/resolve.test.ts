@@ -47,20 +47,20 @@ describe("traceText", () => {
 		expect(traceText("\n  Барыс  ").path).toBe("name");
 	});
 
-	test("reports the chain as broken when nothing matches", () => {
+	test("reports the trace as broken when nothing matches", () => {
 		seed({ name: "Барыс" });
 
 		const found = traceText("Астана");
 		expect(found.broken).toBe(true);
-		expect(found.hops).toEqual([]);
 		expect(found.path).toBeUndefined();
+		expect(found.request).toBeUndefined();
 	});
 
-	test("lists the read before the request that produced it", () => {
+	test("names the field and the call it was read from", () => {
 		seed({ name: "Барыс" });
-		expect(traceText("Барыс").hops.map((hop) => hop.kind)).toEqual([
-			"read",
-			"response",
-		]);
+
+		const found = traceText("Барыс");
+		expect(found.path).toBe("name");
+		expect(found.request?.url).toBe("/api/works");
 	});
 });

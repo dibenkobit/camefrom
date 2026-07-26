@@ -3,7 +3,6 @@ import type { Provenance } from "./shared/types";
 
 export type {
 	Frame,
-	Hop,
 	Position,
 	Provenance,
 	RequestMeta,

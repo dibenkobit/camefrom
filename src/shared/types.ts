@@ -6,6 +6,15 @@ export interface RequestMeta {
 	/** Epoch ms when the request started. */
 	startedAt: number;
 	durationMs: number;
+	/**
+	 * The headers the app set on the request, lower-cased.
+	 *
+	 * Only what the app asked for: a browser adds `Cookie`, `Origin` and the rest
+	 * after JavaScript is done with the request, and never lets it read them
+	 * back. Kept so the call can be reproduced outside the page — which is what
+	 * makes the difference between a `curl` that answers and one that 401s.
+	 */
+	headers?: Record<string, string>;
 }
 
 /** A place in a source file, as an editor would be told to open it. */
@@ -20,13 +29,6 @@ export interface Position {
 	 * the module's own source map is what does that.
 	 */
 	bundle?: string;
-}
-
-/** One step of the chain, rendered as one line in the panel. */
-export interface Hop {
-	kind: "response" | "read";
-	/** Human readable label, e.g. `items[3].contractor.name`. */
-	label: string;
 }
 
 /**
@@ -92,7 +94,6 @@ export interface Provenance {
 	request?: RequestMeta;
 	/** Parsed response body as recorded, for showing it inline. */
 	response?: unknown;
-	hops: Hop[];
 	/** Who rendered it, outermost first. Empty outside React. */
 	tree: Frame[];
 	broken: boolean;

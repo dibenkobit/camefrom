@@ -2,7 +2,7 @@ import { findReads, findResponse } from "../capture/store";
 import { attributeOf, type Fiber, nearestFiber, treeOf } from "../react/fiber";
 import { elementOf } from "../shared/dom";
 import { joinPath, within } from "../shared/path";
-import type { Frame, Hop, Provenance } from "../shared/types";
+import type { Frame, Provenance } from "../shared/types";
 import { entriesOf, isRecordLike, pathsOf, place } from "./match";
 import { type Field, narrow } from "./surroundings";
 import { candidates, textOf } from "./text";
@@ -108,18 +108,6 @@ export function traceText(
 
 		const settled = hits.length === 1;
 		const response = findResponse(first.responseId);
-		const hops: Hop[] = [
-			{
-				kind: "read",
-				label: settled ? first.path : `${hits.length} fields hold this value`,
-			},
-		];
-		if (response) {
-			hops.push({
-				kind: "response",
-				label: `${response.method} ${response.url} · ${response.status} · ${response.durationMs}ms`,
-			});
-		}
 
 		return {
 			value: candidate,
@@ -129,14 +117,13 @@ export function traceText(
 			ambiguous: settled ? undefined : hits.map((hit) => hit.path),
 			request: response,
 			response: response?.body,
-			hops,
 			tree: [],
 			broken: false,
 		};
 	}
 
 	// Nothing matched. Say so rather than offer the nearest guess.
-	return { value: text, hops: [], tree: [], broken: true };
+	return { value: text, tree: [], broken: true };
 }
 
 /**

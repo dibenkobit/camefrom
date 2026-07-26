@@ -3,65 +3,90 @@
 	pointer-events: none;
 }
 
-[hidden] {
+/*
+ * Taken off screen, and by a selector that outranks the ones that put it there.
+ *
+ * A bare `[hidden]` is one attribute — the same specificity as one class — so it
+ * only wins against a class rule that comes before it. `.label` sets
+ * `display: flex` and is declared below, which left the label on screen after alt
+ * was let go: hidden in the DOM, drawn in the viewport, and no way to be rid of
+ * it short of a reload. Naming both boxes puts the rule a specificity above
+ * anything that can set their `display`, so where it sits stops mattering.
+ */
+.box[hidden],
+.label[hidden] {
 	display: none;
 }
 
 .box {
 	position: fixed;
 	z-index: 2147483646;
-	background: var(--wash);
+	background: var(--cf-wash);
 	/* An outline rather than a border: it is drawn outside the box, so the ring
 	   never sits on top of the text it is pointing at. */
-	outline: 1px solid var(--link);
+	outline: 1px solid var(--cf-accent);
 	border-radius: 2px;
 }
 
-.line {
+/*
+ * Two rows, and the answer on top.
+ *
+ * The value used to lead, which spent the best line of the label repeating the
+ * text the pointer is already resting on. What the reader does not know is which
+ * field it came from — so that is the first line, and the outline around the
+ * element is what says which text was traced.
+ */
+.label {
 	position: fixed;
 	z-index: 2147483646;
 	display: flex;
-	flex-wrap: wrap;
-	align-items: baseline;
-	gap: 6px;
-	max-width: min(520px, calc(100vw - 24px));
-	padding: 3px 7px;
-	border: 1px solid var(--edge);
+	flex-direction: column;
+	gap: 1px;
+	max-width: min(560px, calc(100vw - 24px));
+	padding: 4px 8px;
+	border: 1px solid var(--cf-edge);
 	border-radius: 6px;
-	background: var(--bg);
-	color: var(--fg);
+	background: var(--cf-bg);
+	color: var(--cf-fg);
 	box-shadow: 0 4px 14px rgb(0 0 0 / 0.22);
-	font:
-		12px / 1.45 ui-monospace,
-		SFMono-Regular,
-		Menlo,
-		monospace;
+	font: 12px / 1.45 var(--cf-mono);
 }
 
-.line > span {
+.answer {
 	overflow-wrap: anywhere;
-	min-width: 0;
 }
 
-.value {
+/* A sentence rather than a path, so it is set in a face meant for sentences. */
+.answer.prose {
+	font-family: var(--cf-sans);
 	font-weight: 600;
 }
 
-.source,
-.where {
-	color: var(--dim);
+.answer.warn {
+	color: var(--cf-warn);
 }
 
-.broken {
-	color: var(--warn);
+.context {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	color: var(--cf-dim);
+	font-size: 11px;
+	overflow-wrap: anywhere;
 }
 
-.field::before,
-.source::before {
-	content: "← ";
-	color: var(--dim);
+.status {
+	font-weight: 600;
 }
 
-.field.broken::before {
-	content: none;
+.status.good {
+	color: var(--cf-good);
+}
+
+.status.warn {
+	color: var(--cf-warn);
+}
+
+.status.bad {
+	color: var(--cf-bad);
 }

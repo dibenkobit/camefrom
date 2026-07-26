@@ -77,6 +77,41 @@ function capture(meta: RequestMeta, body: unknown): unknown {
 
 const fetchMeta = new WeakMap<Response, RequestMeta>();
 
+/**
+ * The headers the app set on a `fetch`, lower-cased.
+ *
+ * Both places one can come from, in the precedence `fetch` itself applies: a
+ * `Request` passed as the input carries its own, and `init` replaces them name
+ * by name. Nothing here may throw — an invalid header name is the app's problem
+ * to report, from its own call, and not something to fail a request over.
+ */
+function headersOf(
+	input: RequestInfo | URL,
+	init?: RequestInit,
+): Record<string, string> | undefined {
+	if (typeof Headers === "undefined") return undefined;
+
+	try {
+		const given =
+			typeof Request !== "undefined" && input instanceof Request
+				? new Headers(input.headers)
+				: new Headers();
+		if (init?.headers) {
+			new Headers(init.headers).forEach((value, name) => {
+				given.set(name, value);
+			});
+		}
+
+		const headers: Record<string, string> = {};
+		given.forEach((value, name) => {
+			headers[name] = value;
+		});
+		return Object.keys(headers).length > 0 ? headers : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 function patchFetch(): void {
 	if (typeof globalThis.fetch !== "function" || typeof Response === "undefined")
 		return;
@@ -95,6 +130,7 @@ function patchFetch(): void {
 			status: response.status,
 			startedAt,
 			durationMs: Date.now() - startedAt,
+			headers: headersOf(input, init),
 		});
 		return response;
 	};
@@ -122,6 +158,8 @@ interface XhrMeta {
 	method: string;
 	url: string;
 	startedAt: number;
+	/** Whatever the app set through `setRequestHeader`, lower-cased. */
+	headers?: Record<string, string>;
 	/** responseText can be read many times; the body is only recorded once. */
 	remembered?: boolean;
 }
@@ -145,6 +183,28 @@ function patchXhr(): void {
 	): void {
 		xhrMeta.set(this, { method, url: String(url), startedAt: 0 });
 		originalOpen.call(this, method, url, isAsync, username, password);
+	});
+
+	// The only seam a header passes through, and the reason a `curl` copied out
+	// of the panel carries the app's `Authorization` rather than none: XHR keeps
+	// what it was given to itself and offers nothing to read it back with.
+	const originalSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+	XMLHttpRequest.prototype.setRequestHeader = mark(function setRequestHeader(
+		this: XMLHttpRequest,
+		name: string,
+		value: string,
+	): void {
+		const meta = xhrMeta.get(this);
+		if (meta) {
+			meta.headers ??= {};
+			const headers = meta.headers;
+			const key = String(name).toLowerCase();
+			// Set twice is one header holding both values, which is what the wire
+			// carries and so what reproduces the call.
+			const already = headers[key];
+			headers[key] = already === undefined ? value : `${already}, ${value}`;
+		}
+		originalSetHeader.call(this, name, value);
 	});
 
 	XMLHttpRequest.prototype.send = mark(function send(
@@ -188,6 +248,7 @@ function patchXhr(): void {
 					status: this.status,
 					startedAt: meta.startedAt,
 					durationMs: Date.now() - meta.startedAt,
+					headers: meta.headers,
 				});
 			}
 

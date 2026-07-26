@@ -117,14 +117,31 @@ function root(): ShadowRoot | null {
 	return host?.shadowRoot ?? null;
 }
 
+/**
+ * Whether a box of the hint is actually drawn.
+ *
+ * The computed style, not the `hidden` attribute. The attribute was being set
+ * all along while `[hidden]` lost the cascade to the class that sets `display`,
+ * so the label stayed on screen after alt was let go — and a helper that reads
+ * the attribute back is a helper that agrees with the bug.
+ */
+function drawn(selector: string): boolean {
+	const found = root()?.querySelector(selector);
+	if (!found) return false;
+	const style = window.getComputedStyle(
+		found as never,
+	) as unknown as CSSStyleDeclaration;
+	return style.display !== "none";
+}
+
+/** Anything at all on screen: the label, the outline, or both. */
 function shown(): boolean {
-	const wrap = root()?.querySelector(".hint") as HTMLElement | null;
-	return wrap ? !wrap.hidden : false;
+	return drawn(".label") || drawn(".box");
 }
 
 /** Everything the label says, spans run together — assert with `toContain`. */
 function said(): string {
-	return root()?.querySelector(".line")?.textContent ?? "";
+	return root()?.querySelector(".label")?.textContent ?? "";
 }
 
 /**
@@ -149,21 +166,9 @@ function reads(cell: Element): () => number {
 	return () => count;
 }
 
-/**
- * A provenance shaped the way `resolve()` returns it once `ambiguous` and `tree`
- * land in `types.ts`.
- *
- * Cast, because those fields are not on the type on this branch yet — which is
- * also why these two cases are put to `summarize()` directly instead of being
- * driven through the real `resolve()`.
- */
-function shaped(extra: Record<string, unknown>): Provenance {
-	return {
-		hops: [],
-		tree: [],
-		broken: false,
-		...extra,
-	} as unknown as Provenance;
+/** An answer put to `summarize()` directly, for the shapes a DOM cannot stage. */
+function shaped(extra: Partial<Provenance>): Provenance {
+	return { value: "Активен", tree: [], broken: false, ...extra };
 }
 
 describe("before alt is held", () => {
@@ -192,34 +197,55 @@ describe("the palette", () => {
 		seed({ items: [{ contractor: { name: "ТОО Барыс" } }] });
 		hover(render("<div>ТОО Барыс</div>"));
 
-		const line = root()?.querySelector(".line");
+		const label = root()?.querySelector(".label");
 		const drawn = window.getComputedStyle(
-			line as never,
+			label as never,
 		) as unknown as CSSStyleDeclaration;
 
 		expect(drawn.backgroundColor).toBe("#ffffff");
-		expect(drawn.color).toBe("#1a1a1a");
+		expect(drawn.color).toBe("#1f2328");
 	});
 });
 
-describe("the line of answer", () => {
-	test("names the value, the field and the response", () => {
+describe("the glance of answer", () => {
+	/**
+	 * The field leads, and the value is gone from the label entirely.
+	 *
+	 * It used to come first, which spent the best line repeating the text the
+	 * pointer is already resting on. What the reader cannot see is which field it
+	 * came from; the outline is what says which text was traced.
+	 */
+	test("leads with the field, then the call behind it", () => {
 		seed({ items: [{ contractor: { name: "ТОО Барыс" } }] });
 		hover(render("<div>ТОО Барыс</div>"));
 
 		expect(shown()).toBe(true);
-		expect(said()).toContain('"ТОО Барыс"');
-		expect(said()).toContain("items[0].contractor.name");
-		expect(said()).toContain("GET /api/works · 200");
+		expect(root()?.querySelector(".answer")?.textContent).toBe(
+			"items[0].contractor.name",
+		);
+		expect(said()).toContain("GET /api/works");
+		expect(said()).toContain("200");
+		expect(said()).not.toContain('"ТОО Барыс"');
 	});
 
-	test("says so when the text was not read from any response", () => {
+	test("says in plain words when the app built the text itself", () => {
 		seed({ items: [{ status: "Активен" }] });
 		hover(render("<label>Подрядчик</label>"));
 
 		expect(shown()).toBe(true);
-		expect(said()).toContain("✗ not from a recorded response");
+		expect(said()).toContain("Built in the app");
 		expect(said()).not.toContain("Активен");
+	});
+
+	/**
+	 * The one case that is not about the value at all. Both used to read `✗ not
+	 * from a recorded response`, and the difference between them is whether the
+	 * reader goes looking at their own code or at their `install()` call.
+	 */
+	test("blames itself, not the app, when it has recorded nothing", () => {
+		hover(render("<label>Подрядчик</label>"));
+
+		expect(said()).toContain("Nothing recorded yet");
 	});
 
 	test("leaves nothing on screen where there is no text", () => {
@@ -244,37 +270,41 @@ describe("the line of answer", () => {
 	test("counts the fields instead of naming one when several match", () => {
 		const summary = summarize(
 			shaped({
-				value: "Активен",
 				ambiguous: ["items[0].status", "items[1].status"],
 				request: meta,
 			}),
 		);
 
-		expect(summary.field).toBe("2 fields hold this value");
-		expect(summary.broken).toBe(false);
-		expect(summary.source).toBe("GET /api/works · 200");
+		expect(summary.answer).toBe("2 fields hold this value");
+		expect(summary.prose).toBe(true);
+		expect(summary.warn).toBe(false);
+		expect(summary.call).toBe("GET /api/works");
+		expect(summary.status).toBe(200);
 	});
 
-	test("names the innermost component that rendered the text", () => {
-		const summary = summarize(
-			shaped({
-				value: "Активен",
-				path: "items[0].status",
-				tree: [
-					{ name: "WorksTable", target: false },
-					{ name: "WorkRow", target: true },
-				],
-			}),
-		);
+	/**
+	 * The component is the lead exactly when there is no call to name — which is
+	 * the answer that sends the reader to their own code. Beside a call it would be
+	 * a third thing on a label read at a glance.
+	 */
+	test("names the component when there is no call to name instead", () => {
+		const tree = [
+			{ name: "WorksTable", target: false },
+			{ name: "WorkRow", target: true },
+		];
 
-		expect(summary.where).toBe("<WorkRow>");
+		expect(summarize(shaped({ broken: true, tree })).where).toBe("<WorkRow>");
+		expect(
+			summarize(shaped({ path: "items[0].status", request: meta, tree })).where,
+		).toBeUndefined();
 	});
 
-	test("calls a value with no field at all broken, rather than say nothing", () => {
-		const summary = summarize(shaped({ value: "Активен" }));
+	test("marks an untraceable value as such, rather than say nothing", () => {
+		seed({ items: [{ status: "Активен" }] });
+		const summary = summarize(shaped({ broken: true }));
 
-		expect(summary.field).toBe("✗ not from a recorded response");
-		expect(summary.broken).toBe(true);
+		expect(summary.answer).toBe("Built in the app");
+		expect(summary.warn).toBe(true);
 	});
 });
 
@@ -317,7 +347,7 @@ describe("what it costs", () => {
 		const other = document.body.lastElementChild as Element;
 
 		hover(cell);
-		expect(said()).toContain("✗ not from a recorded response");
+		expect(said()).toContain("Nothing recorded yet");
 
 		seed({ items: [{ contractor: { name: "ТОО Барыс" } }] });
 
@@ -387,6 +417,24 @@ describe("getting out of the way", () => {
 			new KeyboardEventOf("keyup", { key: "Alt", bubbles: true }),
 		);
 		expect(shown()).toBe(false);
+	});
+
+	/**
+	 * Both halves, each asked for by name.
+	 *
+	 * They are hidden by one rule and drawn by two, and the rule has to outrank
+	 * both: the outline sets no `display` of its own and went away as asked, while
+	 * the label sets `display: flex` and stayed — leaving a stuck label over an app
+	 * that was live again, with nothing but a reload to clear it.
+	 */
+	test("leaves neither the label nor the outline drawn", () => {
+		upTo(render("<div>Активен</div>"));
+
+		document.dispatchEvent(
+			new KeyboardEventOf("keyup", { key: "Alt", bubbles: true }),
+		);
+		expect(drawn(".label")).toBe(false);
+		expect(drawn(".box")).toBe(false);
 	});
 
 	test("stays for a key-up with alt still held", () => {

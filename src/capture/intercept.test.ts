@@ -52,3 +52,45 @@ test("parsing unrelated JSON records nothing", () => {
 	JSON.parse('{"name":"из localStorage"}');
 	expect(findReads("из localStorage")).toEqual([]);
 });
+
+/**
+ * The headers are what make the `curl` the panel offers answer rather than 401,
+ * and they are only readable on the way out: a `Request` never hands them back
+ * once the browser has sent it.
+ */
+test("the headers the app set are recorded with the request", async () => {
+	const response = await fetch(server.url, {
+		headers: { Authorization: "Bearer abc.123", Accept: "application/json" },
+	});
+	void ((await response.json()) as Body).items[0]?.contractor.name;
+
+	const read = findReads("ТОО Барыс")[0];
+	expect(read && findResponse(read.responseId)?.headers).toEqual({
+		authorization: "Bearer abc.123",
+		accept: "application/json",
+	});
+});
+
+test("a Request carries its own headers, and init still overrides them", async () => {
+	const response = await fetch(
+		new Request(server.url, {
+			headers: { accept: "text/plain", "x-from": "request" },
+		}),
+		{ headers: { accept: "application/json" } },
+	);
+	void ((await response.json()) as Body).items[0]?.contractor.name;
+
+	const read = findReads("ТОО Барыс")[0];
+	expect(read && findResponse(read.responseId)?.headers).toEqual({
+		accept: "application/json",
+		"x-from": "request",
+	});
+});
+
+test("a call with no headers of its own records none", async () => {
+	const response = await fetch(server.url);
+	void ((await response.json()) as Body).items[0]?.contractor.name;
+
+	const read = findReads("ТОО Барыс")[0];
+	expect(read && findResponse(read.responseId)?.headers).toBeUndefined();
+});

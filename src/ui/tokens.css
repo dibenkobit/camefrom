@@ -1,41 +1,87 @@
 /*
- * The palette, one set for the whole tool.
+ * The palette, the two typefaces and the syntax colours — one set for the whole
+ * tool.
  *
  * Declared on `:host` rather than on the box that draws with it, which is what
- * lets the panel and the hint take the same file: custom properties inherit into
- * a shadow tree from its host, and `all: initial` — where both roots start — is
- * defined not to reset them.
+ * lets the panel, the hint and the inspect badge take the same file: custom
+ * properties inherit into a shadow tree from its host, and `all: initial` —
+ * where every root of ours starts — is defined not to reset them.
  *
- * Both roots take the whole palette, though `--mark` is only ever read by the
- * panel and `--wash` only by the hint. Keeping those two anywhere else would mean
- * a second dark-scheme block per file to hold them, which is the shape this file
- * exists to undo: the seven they share were spelled out twice, and stayed in step
- * only for as long as nobody forgot the other copy.
+ * That same inheritance is why every name is prefixed. A `var(--bg)` we forgot
+ * to declare would not fall back to nothing; it would quietly take whatever the
+ * page around us happens to call `--bg`, and the tool would draw itself in the
+ * colours of the app it is inspecting. `--cf-` cannot collide with an app that
+ * does not already know about us.
  *
- * `--wash` — the tint inside the hint's outline — is spelled out per scheme
- * rather than derived from `--link`, so nothing here depends on relative colour
- * syntax being available.
+ * Every root takes the whole palette, though `--cf-mark` is only read by the
+ * panel and `--cf-wash` only by the hint. Keeping those with their readers would
+ * mean a second dark-scheme block per file, which is the shape this file exists
+ * to undo: what they share was spelled out twice, and stayed in step only for as
+ * long as nobody forgot the other copy.
  */
 :host {
-	--bg: #ffffff;
-	--fg: #1a1a1a;
-	--dim: #6b6b6b;
-	--edge: #e2e2e2;
-	--link: #0a58ca;
-	--warn: #b3450b;
-	--mark: #fff3ba;
-	--wash: rgb(10 88 202 / 0.1);
+	/* Prose — verdicts, labels, advice. A devtool that renders a sentence in a
+	   monospace face is asking the reader to work for it. */
+	--cf-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	/* Data — paths, JSON, source, URLs. Anything the reader may have to compare
+	   character by character. */
+	--cf-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+	--cf-bg: #ffffff;
+	/* Chrome the reader is not meant to read: header, tab strip, footer. */
+	--cf-soft: #f6f8fa;
+	--cf-fg: #1f2328;
+	--cf-dim: #656d76;
+	--cf-edge: #d8dee4;
+	/* Anything that can be clicked, and only that. */
+	--cf-accent: #0969da;
+	--cf-warn: #9a6700;
+	--cf-good: #1a7f37;
+	--cf-bad: #cf222e;
+	/* The line the answer is pointing at, and the rule down its left edge that
+	   survives being scrolled sideways. */
+	--cf-mark: #fff8c5;
+	--cf-mark-edge: #d4a72c;
+	/* The tint inside the hint's outline. Spelled out per scheme rather than
+	   derived from `--cf-accent`, so nothing here needs relative colour syntax. */
+	--cf-wash: rgb(9 105 218 / 0.1);
+	--cf-shadow: 0 8px 28px rgb(31 35 40 / 0.24);
+
+	--cf-key: #0550ae;
+	--cf-string: #0a3069;
+	--cf-number: #0550ae;
+	--cf-boolean: #cf222e;
+	--cf-null: #6e7781;
+	--cf-punctuation: #656d76;
+	--cf-keyword: #cf222e;
+	--cf-tag: #116329;
+	--cf-comment: #6e7781;
 }
 
 @media (prefers-color-scheme: dark) {
 	:host {
-		--bg: #17181a;
-		--fg: #ededed;
-		--dim: #8f9094;
-		--edge: #2c2e31;
-		--link: #7aa2f7;
-		--warn: #e0a35e;
-		--mark: #3b3520;
-		--wash: rgb(122 162 247 / 0.16);
+		--cf-bg: #16181d;
+		--cf-soft: #1c2027;
+		--cf-fg: #e6edf3;
+		--cf-dim: #8b949e;
+		--cf-edge: #2f353d;
+		--cf-accent: #6ba6ff;
+		--cf-warn: #d29922;
+		--cf-good: #3fb950;
+		--cf-bad: #f85149;
+		--cf-mark: #2e2a12;
+		--cf-mark-edge: #7a6520;
+		--cf-wash: rgb(107 166 255 / 0.16);
+		--cf-shadow: 0 8px 28px rgb(1 4 9 / 0.6);
+
+		--cf-key: #79c0ff;
+		--cf-string: #a5d6ff;
+		--cf-number: #79c0ff;
+		--cf-boolean: #ff7b72;
+		--cf-null: #8b949e;
+		--cf-punctuation: #8b949e;
+		--cf-keyword: #ff7b72;
+		--cf-tag: #7ee787;
+		--cf-comment: #8b949e;
 	}
 }

@@ -3,11 +3,25 @@ import { elementOf } from "./shared/dom";
 import type { Provenance } from "./shared/types";
 import { resolve } from "./trace/resolve";
 import { hide as hideHint, watch as watchHint } from "./ui/hint";
+import { inspecting, watch as watchMode } from "./ui/inspect";
 import { type Point, show } from "./ui/panel";
 import { nodeAt, ours } from "./ui/pointer";
 import { report } from "./ui/report";
 
 let installed = false;
+
+/**
+ * How to say the shortcut where the reader is sitting.
+ *
+ * `navigator.platform` is deprecated and every browser still answers it, which is
+ * more than can be said for the replacement. Getting this wrong is only cosmetic
+ * — but `⇧⌥C` on Windows is a line nobody can follow.
+ */
+const SHORTCUT =
+	typeof navigator !== "undefined" &&
+	/Mac|iP(hone|ad|od)/.test(navigator.platform ?? "")
+		? "⇧⌥C"
+		: "shift+alt+C";
 
 /**
  * Where to open the panel for a node nobody clicked.
@@ -29,7 +43,8 @@ function listen(): void {
 	document.addEventListener(
 		"click",
 		(event) => {
-			if (!event.altKey) return;
+			// Alt for the one-off question, the mode for reading a whole table.
+			if (!event.altKey && !inspecting()) return;
 			// A click on the panel belongs to the panel, and quietly: saying "no
 			// text under the pointer" for its own text would be answering a
 			// question nobody asked.
@@ -77,14 +92,22 @@ function listen(): void {
 		{ capture: true, passive: true },
 	);
 
-	// The cheap preview: one line of answer under the pointer for as long as alt
-	// is held, so reading a table is a movement rather than a click per cell.
+	// The cheap preview: one glance of answer under the pointer, so reading a
+	// table is a movement rather than a click per cell.
 	watchHint();
+
+	// Leaving the mode has to take the label off screen with it, or the last thing
+	// the pointer was over stays outlined over an app that is live again.
+	watchMode((mode) => {
+		if (!mode) hideHint();
+	});
 
 	// Says the tool is alive and how to use it, which is the difference between
 	// "nothing happened" being a bug report and being a question.
 	console.log(
-		"%ccamefrom%c hold alt over any text to trace it, alt-click for the panel",
+		`%ccamefrom%c hold alt over any value, or press %c${SHORTCUT}%c to keep inspecting. Click for the whole answer.`,
+		"font-weight:bold",
+		"font-weight:normal",
 		"font-weight:bold",
 		"font-weight:normal",
 	);

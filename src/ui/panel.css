@@ -2,6 +2,16 @@
 	all: initial;
 }
 
+/*
+ * The panel, in the order it is read: the verdict, what follows from it, the
+ * three facts behind it, then whichever pane of evidence answers it.
+ *
+ * The height is not divided. Five sections each capped at a seventh of the panel
+ * is what this replaced — a response body, a source excerpt and a render tree all
+ * in slivers too short to read and too shallow to scroll. Everything above the
+ * pane keeps its rows because it has few, and the one pane on screen takes the
+ * rest.
+ */
 .panel {
 	position: fixed;
 	right: 16px;
@@ -9,47 +19,27 @@
 	z-index: 2147483647;
 	display: flex;
 	flex-direction: column;
-	width: 460px;
+	width: 560px;
 	max-width: calc(100vw - 32px);
-	max-height: min(70vh, 620px);
-	border: 1px solid var(--edge);
+	max-height: min(78vh, 720px);
+	border: 1px solid var(--cf-edge);
 	border-radius: 10px;
-	background: var(--bg);
-	color: var(--fg);
-	box-shadow: 0 12px 32px rgb(0 0 0 / 0.28);
-	font:
-		12px / 1.55 ui-monospace,
-		SFMono-Regular,
-		Menlo,
-		monospace;
+	background: var(--cf-bg);
+	color: var(--cf-fg);
+	box-shadow: var(--cf-shadow);
+	font: 12px / 1.5 var(--cf-sans);
 	/* Clipped rather than hidden: overflow hidden is a scroll container, and one
-	   scrollIntoView in the body would scroll the header off the top of a panel
+	   scrollIntoView in a pane would scroll the header off the top of a panel
 	   that has no scrollbar to bring it back. */
 	overflow: clip;
 }
 
-/*
- * How the height is divided between the five sections below.
- *
- * Left to the flex defaults the tallest section wins twice over: what does not
- * fit is taken off each of them in proportion to how tall it asked to be, so a
- * response body of ten thousand lines squeezes the tree and the excerpt above
- * it into a couple of pixels each — the middle of the panel neither readable
- * nor scrollable, which is what this used to do.
- *
- * So every section above the body keeps its rows and gives none of them back.
- * Each has a cap it scrolls past — three lines of value, six of chain, seven of
- * tree, seven of excerpt — and the body lives on what is left of the panel,
- * down to a floor of five lines of its own. All five full, borders and padding
- * included, come to 608 of the 620 pixels the panel can be. The vh half of
- * every cap holds the same division on a screen too short for that.
- */
 .head {
 	display: flex;
-	align-items: baseline;
-	gap: 8px;
+	flex: none;
+	align-items: flex-start;
+	gap: 10px;
 	padding: 10px 12px;
-	border-bottom: 1px solid var(--edge);
 	cursor: grab;
 	/* A drag by the header must not become a text selection, nor — on a touch
 	   screen — a scroll, which is what would swallow the pointermoves. */
@@ -61,142 +51,411 @@
 	cursor: grabbing;
 }
 
-.value {
+.said {
 	flex: 1;
-	max-height: min(6vh, 56px);
+	min-width: 0;
+}
+
+/*
+ * The headline, and the only thing on screen set in a face meant for sentences.
+ *
+ * Uncoloured on purpose. Green for "came from the API" would read as "this value
+ * is fine", which is the opposite of why anybody is looking: the value is wrong
+ * and the answer is that it arrived wrong. Colour is spent where it carries
+ * something — a status, a marked line — and `quiet` is the one verdict that is
+ * genuinely a warning, because it is about the tool rather than the value.
+ */
+.verdict {
+	font-size: 13px;
 	font-weight: 600;
+	line-height: 1.4;
+}
+
+.verdict.quiet {
+	color: var(--cf-warn);
+}
+
+.value {
+	max-height: min(9vh, 66px);
+	margin-top: 2px;
+	font-family: var(--cf-mono);
 	overflow: auto;
 	overflow-wrap: anywhere;
+}
+
+.acts {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 2px;
 }
 
 .act {
 	all: unset;
-	padding: 0 4px;
-	color: var(--dim);
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 6px;
+	border-radius: 5px;
+	color: var(--cf-accent);
 	cursor: pointer;
-	line-height: 1;
+	font: 11px / 1 var(--cf-sans);
 	white-space: nowrap;
 }
 
 .act:hover {
-	color: var(--fg);
+	background: var(--cf-soft);
 }
 
-.chain {
+.act:focus-visible {
+	outline: 2px solid var(--cf-accent);
+	outline-offset: 1px;
+}
+
+.act[aria-expanded="true"] {
+	background: var(--cf-soft);
+}
+
+.act.close {
+	color: var(--cf-dim);
+}
+
+.act.close:hover {
+	color: var(--cf-fg);
+}
+
+/* An icon is drawn, not typed: `✕` and `✗` are letters in a font the page chose,
+   and they sit on the baseline wherever that font puts them. */
+.icon {
+	display: block;
+	width: 12px;
+	height: 12px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.5;
+	stroke-linecap: round;
+}
+
+.advice {
+	flex: none;
+	padding: 0 12px 10px;
+	color: var(--cf-dim);
+	line-height: 1.45;
+}
+
+/* The one verdict that is about the tool rather than the value, and the only one
+   whose advice is a thing to go and fix. */
+.advice.quiet {
+	color: var(--cf-warn);
+}
+
+/*
+ * The copy menu, in the flow of the panel rather than floating over it.
+ *
+ * The panel clips what leaves it, so a dropdown positioned over the tab strip
+ * would be cut off at the border — and a menu that has to be measured against
+ * the viewport is a second placement problem for four items. Opening downward and
+ * pushing the panes along cannot be clipped and cannot be mispositioned.
+ */
+.menu {
 	display: flex;
 	flex: none;
 	flex-direction: column;
-	gap: 2px;
-	max-height: min(12vh, 112px);
-	padding: 8px 12px;
-	overflow: auto;
+	padding: 4px;
+	border-top: 1px solid var(--cf-edge);
+	border-bottom: 1px solid var(--cf-edge);
+	background: var(--cf-soft);
 }
 
-.hop {
-	display: flex;
-	gap: 6px;
-}
-
-.arrow {
-	color: var(--dim);
-}
-
-.where {
-	all: unset;
-	color: var(--link);
-	cursor: pointer;
-	text-decoration: underline;
-}
-
-.broken {
-	color: var(--warn);
-}
-
-.choices {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 1px;
-	padding-left: 14px;
-}
-
-.choice {
-	all: unset;
-	color: var(--link);
-	cursor: pointer;
-}
-
-.choice:hover,
-.choice.on {
-	background: var(--mark);
-	color: var(--fg);
-}
-
-.tree {
-	flex: none;
-	max-height: min(14vh, 130px);
-	padding: 8px 12px;
-	border-top: 1px solid var(--edge);
-	overflow: auto;
-}
-
-.tree:empty {
+.menu[hidden] {
 	display: none;
+}
+
+.item {
+	all: unset;
+	padding: 5px 8px;
+	border-radius: 5px;
+	cursor: pointer;
+}
+
+.item:hover:not([disabled]) {
+	background: var(--cf-bg);
+}
+
+.item:focus-visible {
+	outline: 2px solid var(--cf-accent);
+	outline-offset: -2px;
+}
+
+.item[disabled] {
+	cursor: default;
+}
+
+.what {
+	display: block;
+}
+
+.note {
+	display: block;
+	color: var(--cf-dim);
+	font-size: 11px;
+	line-height: 1.35;
+}
+
+.item[disabled] .what {
+	color: var(--cf-dim);
+}
+
+/* The answer itself: a label column that never wraps, and data that always may. */
+.facts {
+	display: grid;
+	flex: none;
+	grid-template-columns: max-content minmax(0, 1fr);
+	gap: 5px 10px;
+	padding: 0 12px 10px;
+	border-bottom: 1px solid var(--cf-edge);
+}
+
+.label {
+	color: var(--cf-dim);
+	font-size: 11px;
+	line-height: 1.45;
+}
+
+.data {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 3px 8px;
+	min-width: 0;
+	font-family: var(--cf-mono);
+	overflow-wrap: anywhere;
+}
+
+/* Something the tool cannot show, and why. Never an empty row. */
+.data.absent {
+	color: var(--cf-dim);
+	font-family: var(--cf-sans);
+}
+
+.status {
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.status.good {
+	color: var(--cf-good);
+}
+
+.status.warn {
+	color: var(--cf-warn);
+}
+
+.status.bad {
+	color: var(--cf-bad);
+}
+
+.took {
+	color: var(--cf-dim);
+	font-size: 11px;
+}
+
+.tabs {
+	display: flex;
+	flex: none;
+	gap: 2px;
+	padding: 0 8px;
+	border-bottom: 1px solid var(--cf-edge);
+	background: var(--cf-soft);
+}
+
+.tab {
+	all: unset;
+	padding: 6px 8px;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
+	color: var(--cf-dim);
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.tab:hover {
+	color: var(--cf-fg);
+}
+
+.tab:focus-visible {
+	outline: 2px solid var(--cf-accent);
+	outline-offset: -2px;
+}
+
+.tab[aria-selected="true"] {
+	border-bottom-color: var(--cf-accent);
+	color: var(--cf-fg);
+}
+
+.count {
+	margin-left: 5px;
+	color: var(--cf-dim);
+	font-size: 11px;
+}
+
+/*
+ * One pane at a time, and never shorter than this.
+ *
+ * A floor rather than a fit: a panel that resizes itself as the reader moves
+ * between tabs is a panel that walks out from under the pointer. Content past the
+ * floor scrolls, and the panel's own maximum is what stops it growing.
+ */
+.pane {
+	flex: 1 1 auto;
+	min-height: min(34vh, 260px);
+	overflow: auto;
+	overscroll-behavior: contain;
+}
+
+/* Rows are only ever as wide as the box that scrolls them, which cuts every mark
+   off where the viewport happens to end. Sized to the longest line instead, so
+   the rows inside can stretch to it and a mark ends up a block rather than a
+   ragged edge. */
+.rows {
+	width: max-content;
+	min-width: 100%;
+	padding: 6px 0;
+	font-family: var(--cf-mono);
+	/* A file indented with tabs is indented by eight columns unless somebody says
+	   otherwise, and nine lines of JSX four levels deep then start past the right
+	   edge of the panel. Two is what the editor showing the same file uses. */
+	tab-size: 2;
+}
+
+.line {
+	display: flex;
+	gap: 12px;
+	padding: 0 12px;
+	white-space: pre;
+}
+
+.line.on {
+	background: var(--cf-mark);
+	/* A rule down the left edge, inset so it survives being scrolled sideways —
+	   the marked line stays findable in a body that is wider than the panel. */
+	box-shadow: inset 2px 0 0 var(--cf-mark-edge);
+}
+
+.num {
+	min-width: 3em;
+	text-align: right;
+	color: var(--cf-dim);
+	user-select: none;
+}
+
+.t-key {
+	color: var(--cf-key);
+}
+
+.t-string {
+	color: var(--cf-string);
+}
+
+.t-number {
+	color: var(--cf-number);
+}
+
+.t-boolean {
+	color: var(--cf-boolean);
+}
+
+.t-null {
+	color: var(--cf-null);
+}
+
+.t-punctuation {
+	color: var(--cf-punctuation);
+}
+
+.t-comment {
+	color: var(--cf-comment);
+}
+
+.t-keyword {
+	color: var(--cf-keyword);
+}
+
+.t-tag {
+	color: var(--cf-tag);
+}
+
+/* Which file the excerpt is from, kept on screen while it is scrolled: it is
+   regularly not the frame that was pointed at, and an excerpt from a component
+   two frames out is a wrong answer wearing the face of a right one. */
+.origin {
+	position: sticky;
+	top: 0;
+	padding: 6px 12px;
+	border-bottom: 1px solid var(--cf-edge);
+	background: var(--cf-bg);
+	color: var(--cf-dim);
+	font-size: 11px;
+}
+
+/* A path in a sentence, as opposed to `.where`, which is one you can click. */
+.origin .file {
+	font-family: var(--cf-mono);
+}
+
+.rest {
+	padding: 4px 12px 0;
+	color: var(--cf-dim);
+	font-family: var(--cf-mono);
 }
 
 .frame {
 	display: flex;
-	gap: 8px;
+	gap: 10px;
+	padding: 1px 12px;
 }
 
 .name {
-	color: var(--dim);
+	color: var(--cf-dim);
+	font-family: var(--cf-mono);
 	white-space: pre;
 }
 
 .frame.on .name {
-	color: var(--fg);
+	color: var(--cf-fg);
 	font-weight: 600;
 }
 
-.code {
-	flex: none;
-	max-height: min(14vh, 130px);
-	padding: 8px 0;
-	border-top: 1px solid var(--edge);
-	overflow: auto;
+.where {
+	all: unset;
+	color: var(--cf-accent);
+	cursor: pointer;
+	font-family: var(--cf-mono);
+	text-decoration: underline;
+	text-underline-offset: 2px;
 }
 
-.code:empty {
-	display: none;
-}
-
-.origin {
-	padding: 0 12px 6px;
-	color: var(--dim);
-}
-
-.note {
-	padding-top: 4px;
-	color: var(--warn);
-	overflow-wrap: anywhere;
+.where:focus-visible {
+	outline: 2px solid var(--cf-accent);
+	outline-offset: 1px;
 }
 
 .why {
-	color: var(--warn);
-	opacity: 0.85;
+	color: var(--cf-warn);
 }
 
 .why.link {
 	all: unset;
-	color: var(--warn);
+	color: var(--cf-warn);
 	cursor: pointer;
 	text-decoration: underline;
+	text-underline-offset: 2px;
 }
 
 .stack {
-	padding-left: 14px;
-	color: var(--dim);
+	padding: 2px 12px 2px 26px;
+	color: var(--cf-dim);
+	font-family: var(--cf-mono);
 	white-space: pre;
 }
 
@@ -204,62 +463,75 @@
 	display: none;
 }
 
-/* Rows are only ever as wide as the box that scrolls them, which cuts every
-   mark off where the viewport happens to end. Sized to the longest line here
-   instead, so the rows inside can stretch to it and the mark ends up a block
-   rather than a ragged edge. */
-.rows {
-	width: max-content;
-	min-width: 100%;
+.reload {
+	margin: 6px 12px 0;
+	padding: 6px 8px;
+	border-radius: 5px;
+	background: var(--cf-soft);
+	color: var(--cf-warn);
 }
 
-.line {
+.choices {
 	display: flex;
-	gap: 10px;
-	padding: 0 12px;
-	white-space: pre;
+	flex-direction: column;
+	align-items: stretch;
+	padding: 6px;
 }
 
-.line.on {
-	background: var(--mark);
-	color: var(--fg);
+.choice {
+	all: unset;
+	padding: 5px 8px;
+	border-radius: 5px;
+	color: var(--cf-accent);
+	cursor: pointer;
+	font-family: var(--cf-mono);
+	overflow-wrap: anywhere;
 }
 
-.num {
-	min-width: 2.5em;
-	text-align: right;
-	color: var(--dim);
-	user-select: none;
+.choice:hover {
+	background: var(--cf-soft);
 }
 
-.rest {
-	padding: 2px 12px 0;
-	color: var(--dim);
+.choice:focus-visible {
+	outline: 2px solid var(--cf-accent);
+	outline-offset: -2px;
 }
 
-.body {
-	/* Sized to its content like every other section, rather than to a basis of
-	   zero: a section that starts at nothing is a section that never shrinks,
-	   and the rest of the panel ends up paying for the whole response. */
-	flex: 1 1 auto;
-	min-height: min(10vh, 92px);
-	margin: 0;
-	/* No padding across: the rows carry their own, so a marked line fills the
-	   box edge to edge instead of stopping short of it. */
-	padding: 8px 0 12px;
-	border-top: 1px solid var(--edge);
-	overflow: auto;
-	color: var(--dim);
+.choice.on {
+	background: var(--cf-mark);
+	color: var(--cf-fg);
 }
 
-/* Every section that scrolls keeps the gesture to itself. Without this a wheel
-   that reaches the end of the response body carries on into the page behind —
-   the panel stops moving and the table under it starts, which reads as the panel
-   never having taken the scroll at all. */
-.value,
-.chain,
-.tree,
-.code,
-.body {
-	overscroll-behavior: contain;
+/* Nothing to show, and what would change that. A blank pane is the one thing
+   worse than bad news, because it cannot be told apart from a broken tool. */
+.empty {
+	padding: 12px;
+	color: var(--cf-dim);
+	line-height: 1.5;
+}
+
+.empty .fix {
+	display: block;
+	margin-top: 4px;
+	color: var(--cf-warn);
+}
+
+.foot {
+	display: flex;
+	flex: none;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+	padding: 5px 12px;
+	border-top: 1px solid var(--cf-edge);
+	background: var(--cf-soft);
+	color: var(--cf-dim);
+	font-size: 11px;
+}
+
+kbd {
+	padding: 0 4px;
+	border: 1px solid var(--cf-edge);
+	border-radius: 3px;
+	background: var(--cf-bg);
+	font: 10px / 1.6 var(--cf-mono);
 }

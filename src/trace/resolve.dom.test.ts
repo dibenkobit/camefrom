@@ -141,7 +141,6 @@ describe("telling identical values apart", () => {
 			"items[1].status",
 			"items[2].status",
 		]);
-		expect(found?.hops[0]?.label).toBe("3 fields hold this value");
 	});
 
 	test("narrows the value index by a record it can place", () => {
@@ -228,7 +227,6 @@ describe("when the record never reaches the component", () => {
 		const found = resolve(cellIn(3, 0));
 		expect(found?.path).toBeUndefined();
 		expect(found?.ambiguous).toEqual(["[1].region", "[3].region"]);
-		expect(found?.hops[0]?.label).toBe("2 fields hold this value");
 	});
 
 	/**
@@ -439,7 +437,7 @@ describe("the render tree", () => {
 
 		const found = resolve(label);
 		expect(found?.broken).toBe(true);
-		expect(found?.hops).toEqual([]);
+		expect(found?.request).toBeUndefined();
 		expect(found?.tree.at(-1)?.name).toBe("WorkForm");
 	});
 });

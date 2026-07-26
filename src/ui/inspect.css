@@ -1,0 +1,82 @@
+:host {
+	all: initial;
+}
+
+/*
+ * The badge that says the mode is on.
+ *
+ * A mode with no indicator is the oldest bug in interface design: the reader
+ * walks away, comes back, clicks something in their app and nothing happens. It
+ * sits bottom centre because that is where an app's own chrome least often is —
+ * headers, toolbars and notifications all live along the top and the right.
+ */
+.badge {
+	position: fixed;
+	bottom: 16px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 2147483647;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 5px 6px 5px 10px;
+	border: 1px solid var(--cf-edge);
+	border-radius: 999px;
+	background: var(--cf-bg);
+	color: var(--cf-fg);
+	box-shadow: var(--cf-shadow);
+	font: 11px / 1.4 var(--cf-sans);
+	white-space: nowrap;
+}
+
+.badge[hidden] {
+	display: none;
+}
+
+.dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--cf-accent);
+	animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+	50% {
+		opacity: 0.35;
+	}
+}
+
+/* Something that blinks in the corner of the eye for as long as the mode is on
+   is a cost some readers pay more than others. */
+@media (prefers-reduced-motion: reduce) {
+	.dot {
+		animation: none;
+	}
+}
+
+.stop {
+	all: unset;
+	padding: 2px 7px;
+	border-radius: 999px;
+	background: var(--cf-soft);
+	color: var(--cf-dim);
+	cursor: pointer;
+	font: 11px / 1.4 var(--cf-sans);
+}
+
+.stop:hover {
+	color: var(--cf-fg);
+}
+
+.stop:focus-visible {
+	outline: 2px solid var(--cf-accent);
+	outline-offset: 1px;
+}
+
+kbd {
+	padding: 0 4px;
+	border: 1px solid var(--cf-edge);
+	border-radius: 3px;
+	font: 10px / 1.6 var(--cf-mono);
+}

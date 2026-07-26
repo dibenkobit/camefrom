@@ -29,10 +29,16 @@ interface Body {
 }
 
 /** How axios reads a response: text off the request, parsed by hand. */
-function requestText(url: string): Promise<string> {
+function requestText(
+	url: string,
+	headers: Record<string, string> = {},
+): Promise<string> {
 	return new Promise((settle, fail) => {
 		const request = new XMLHttpRequest();
 		request.open("GET", url);
+		for (const [name, value] of Object.entries(headers)) {
+			request.setRequestHeader(name, value);
+		}
 		request.onreadystatechange = () => {
 			if (request.readyState !== XMLHttpRequest.DONE) return;
 			settle(request.responseText);
@@ -59,6 +65,42 @@ test("the XHR that produced a value is recorded alongside it", async () => {
 	const recorded = read && findResponse(read.responseId);
 	expect(recorded?.method).toBe("GET");
 	expect(recorded?.status).toBe(200);
+});
+
+/**
+ * XHR keeps what it was given to itself: there is no way to read a header back
+ * off a request, so `setRequestHeader` is the only seam one passes through — and
+ * the reason the panel can offer a `curl` that carries the app's own token.
+ */
+test("the headers set on an XHR are recorded with it", async () => {
+	const body = JSON.parse(
+		await requestText(server.url.href, { Authorization: "Bearer xhr.1" }),
+	) as Body;
+	void body.items[0]?.contractor.name;
+
+	const read = findReads("ТОО Астана")[0];
+	expect(read && findResponse(read.responseId)?.headers).toEqual({
+		authorization: "Bearer xhr.1",
+	});
+});
+
+test("a header set twice is recorded as the one the wire carries", async () => {
+	const request = new XMLHttpRequest();
+	await new Promise<void>((settle) => {
+		request.open("GET", server.url.href);
+		request.setRequestHeader("accept", "text/plain");
+		request.setRequestHeader("accept", "application/json");
+		request.onreadystatechange = () => {
+			if (request.readyState === XMLHttpRequest.DONE) settle();
+		};
+		request.send();
+	});
+	void (JSON.parse(request.responseText) as Body).items[0]?.contractor.name;
+
+	const read = findReads("ТОО Астана")[0];
+	expect(read && findResponse(read.responseId)?.headers).toEqual({
+		accept: "text/plain, application/json",
+	});
 });
 
 test("reading responseText repeatedly records the body once", async () => {

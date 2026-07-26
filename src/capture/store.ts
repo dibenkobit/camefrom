@@ -1,7 +1,13 @@
 import type { RequestMeta } from "../shared/types";
 
-/** Responses kept for inspection. Older ones fall off the end. */
-const MAX_RESPONSES = 50;
+/**
+ * Responses kept for inspection. Older ones fall off the end.
+ *
+ * Exported because the panel says the number out loud: a field whose response
+ * has aged out is a different answer from one that was never recorded, and
+ * neither is readable as "50" without being told what 50 is.
+ */
+export const MAX_RESPONSES = 50;
 /** Distinct values we can look up. Oldest keys are evicted first. */
 const MAX_TRACKED_VALUES = 20_000;
 

@@ -1,54 +1,60 @@
-import { revision } from "../capture/store";
+import { MAX_RESPONSES, recorded, revision } from "../capture/store";
 import { elementOf } from "../shared/dom";
 import type { Provenance } from "../shared/types";
 import { resolve } from "../trace/resolve";
 import rules from "./hint.css" with { type: "text" };
+import { inspecting } from "./inspect";
 import { nodeAt, ours, own } from "./pointer";
-import { title } from "./report";
-import tokens from "./tokens.css" with { type: "text" };
+import palette from "./tokens.css" with { type: "text" };
+import { verdictOf } from "./verdict";
 
 /** How far the label keeps away from the pointer, in px. */
 const AWAY = 14;
 
-/** Said out loud rather than left blank: see the note on `Summary.field`. */
-const BROKEN = "✗ not from a recorded response";
-
 /** The shared palette, then the rules that draw with it. */
-const STYLE = tokens + rules;
+const STYLE = palette + rules;
 
-/** One line of answer, in the pieces the hint colours differently. */
+/**
+ * One line of answer, in the pieces the hint sets differently.
+ *
+ * Two rows and no more: this is read at a glance, while the pointer is moving
+ * across a table, and every row past the second is a row nobody has time for.
+ * The panel is where the rest of it lives.
+ */
 export interface Summary {
-	/** The text as it was traced, quoted the way the panel quotes it. */
-	value: string;
 	/**
-	 * The field it came from, how many fields hold it, or why neither can be
-	 * said. Never empty: half a line is indistinguishable from a broken tool.
+	 * The field it came from, or the verdict when there is no field to name.
+	 * Never empty: half a line is indistinguishable from a broken tool.
 	 */
-	field: string;
-	/** Whether `field` is the bad news, so it can be coloured as such. */
-	broken: boolean;
-	/** `GET /api/works · 200`, when a recorded response is behind it. */
-	source?: string;
-	/** Who rendered it, innermost only — `<WorkRow>`. */
+	answer: string;
+	/** Whether `answer` is a sentence rather than a path, and set as one. */
+	prose: boolean;
+	/** Whether it is the bad news, so it can be coloured as such. */
+	warn: boolean;
+	/** `GET /api/works`, when a recorded response is behind it. */
+	call?: string;
+	/** Its status, kept apart from the call so it can be coloured. */
+	status?: number;
+	/** Who rendered it — `<WorkRow>`. Shown when no call can be. */
 	where?: string;
 }
 
 /** What is on screen, built once and then only written to. */
 interface View {
 	host: HTMLElement;
-	wrap: HTMLElement;
 	box: HTMLElement;
-	line: HTMLElement;
-	value: HTMLElement;
-	field: HTMLElement;
-	source: HTMLElement;
+	label: HTMLElement;
+	answer: HTMLElement;
+	context: HTMLElement;
+	call: HTMLElement;
+	status: HTMLElement;
 	where: HTMLElement;
 }
 
 let view: View | undefined;
 let watching = false;
 
-/** Whether anything is on screen. Keeps the alt-is-not-held path a boolean. */
+/** Whether anything is on screen. Keeps the nothing-to-do path a boolean. */
 let showing = false;
 /** The node the current answer belongs to; `undefined` before the first move. */
 let resolved: Node | null | undefined;
@@ -70,8 +76,8 @@ const answers = new WeakMap<
  * Hovering a table runs this on every frame the pointer moves, and `resolve()`
  * walks the fiber tree and searches recorded bodies — so the answer is kept.
  * A response that lands afterwards bumps the revision and the node is asked
- * again, because the reason it was `✗` a moment ago may be that the request had
- * not come back yet.
+ * again, because the reason it could not be placed a moment ago may be that the
+ * request had not come back yet.
  */
 function traced(node: Node): Provenance | null {
 	const at = revision();
@@ -83,27 +89,33 @@ function traced(node: Node): Provenance | null {
 	return provenance;
 }
 
-/** One line of answer: the value, the field it came from, and the response. */
+/**
+ * One glance of answer: which field, and which call it came out of.
+ *
+ * The verdict comes from the same function the panel uses, so the two never
+ * disagree about what happened — the hint says it in three words and the panel
+ * in a sentence, but it is one conclusion.
+ */
 export function summarize(provenance: Provenance): Summary {
-	const many = provenance.ambiguous ?? [];
-
-	// Naming one of several would be exactly the wrong answer the row lookup
-	// exists to avoid, so this says how many there are instead.
-	const field =
-		many.length > 1
-			? `${many.length} fields hold this value`
-			: (provenance.path ?? many[0]);
+	const verdict = verdictOf(provenance, {
+		count: recorded().length,
+		limit: MAX_RESPONSES,
+	});
 	const request = provenance.request;
 	const innermost = provenance.tree.at(-1)?.name;
+	const traceless = verdict.answer === "app" || verdict.answer === "quiet";
 
 	return {
-		value: title(provenance.value),
-		field: field ?? BROKEN,
-		// No field to name reads the same as a broken trace, and both have to
-		// say so out loud.
-		broken: provenance.broken || field === undefined,
-		source: request && `${request.method} ${request.url} · ${request.status}`,
-		where: innermost && `<${innermost}>`,
+		// The field when there is one; the verdict when naming a field would mean
+		// picking one of several, or inventing one.
+		answer: provenance.path ?? verdict.says,
+		prose: provenance.path === undefined,
+		warn: traceless,
+		call: request && `${request.method} ${request.url}`,
+		status: request?.status,
+		// The component is the lead when there is no call to name, and clutter when
+		// there is: two rows, and the panel holds the rest.
+		where: request ? undefined : innermost && `<${innermost}>`,
 	};
 }
 
@@ -137,33 +149,51 @@ function mount(): View {
 	const style = element("style");
 	style.textContent = STYLE;
 
-	const wrap = element("div", "hint");
-	wrap.hidden = true;
 	const box = element("div", "box");
-	const line = element("div", "line");
-	const value = element("span", "value");
-	const field = element("span", "field");
-	const source = element("span", "source");
+	box.hidden = true;
+	const label = element("div", "label");
+	label.hidden = true;
+
+	const answer = element("div", "answer");
+	const context = element("div", "context");
+	const call = element("span", "call");
+	const status = element("span", "status");
 	const where = element("span", "where");
 
-	line.append(value, field, source, where);
-	wrap.append(box, line);
-	shadow.append(style, wrap);
+	context.append(call, status, where);
+	label.append(answer, context);
+	shadow.append(style, box, label);
 	document.body.append(host);
 
-	view = { host, wrap, box, line, value, field, source, where };
+	view = { host, box, label, answer, context, call, status, where };
 	return view;
+}
+
+/** How much of a problem a status is. Matches the panel, which explains it. */
+function tone(status: number): string {
+	if (status === 0 || (status >= 300 && status < 400)) return "status";
+	if (status < 300) return "status good";
+	return status < 500 ? "status warn" : "status bad";
 }
 
 /** Writes the label. Text only, never markup: a response body is untrusted. */
 function say(into: View, summary: Summary): void {
-	into.value.textContent = summary.value;
-	into.field.textContent = summary.field;
-	into.field.className = summary.broken ? "field broken" : "field";
-	into.source.textContent = summary.source ?? "";
-	into.source.hidden = !summary.source;
+	into.answer.textContent = summary.answer;
+	into.answer.className = `answer${summary.prose ? " prose" : ""}${summary.warn ? " warn" : ""}`;
+
+	into.call.textContent = summary.call ?? "";
+	into.call.hidden = !summary.call;
+
+	const status = summary.status;
+	into.status.textContent =
+		status === undefined || status === 0 ? "" : String(status);
+	into.status.className = status === undefined ? "status" : tone(status);
+	into.status.hidden = status === undefined || status === 0;
+
 	into.where.textContent = summary.where ?? "";
 	into.where.hidden = !summary.where;
+	// A row with nothing in it is a row of padding under the answer.
+	into.context.hidden = !summary.call && !summary.where;
 }
 
 function place(box: HTMLElement, rect: DOMRect): void {
@@ -180,24 +210,24 @@ function place(box: HTMLElement, rect: DOMRect): void {
  * ever being measured — and measuring it would mean reading layout back after
  * writing it, on every frame of every hover.
  */
-function follow(line: HTMLElement, x: number, y: number): void {
+function follow(label: HTMLElement, x: number, y: number): void {
 	const width = window.innerWidth;
 	const height = window.innerHeight;
 
 	if (x * 2 > width) {
-		line.style.left = "auto";
-		line.style.right = `${width - x + AWAY}px`;
+		label.style.left = "auto";
+		label.style.right = `${width - x + AWAY}px`;
 	} else {
-		line.style.right = "auto";
-		line.style.left = `${x + AWAY}px`;
+		label.style.right = "auto";
+		label.style.left = `${x + AWAY}px`;
 	}
 
 	if (y * 2 > height) {
-		line.style.top = "auto";
-		line.style.bottom = `${height - y + AWAY}px`;
+		label.style.top = "auto";
+		label.style.bottom = `${height - y + AWAY}px`;
 	} else {
-		line.style.bottom = "auto";
-		line.style.top = `${y + AWAY}px`;
+		label.style.bottom = "auto";
+		label.style.top = `${y + AWAY}px`;
 	}
 }
 
@@ -215,8 +245,8 @@ function paint(): void {
 
 	const outlined = answer && node ? elementOf(node) : null;
 	if (!answer || !outlined) {
-		// Nothing under the pointer carries traceable text. The click path is
-		// the one that says so; a hover has nothing to report.
+		// Nothing under the pointer carries traceable text. The click path is the
+		// one that says so; a hover has nothing to report.
 		hide();
 		return;
 	}
@@ -227,15 +257,16 @@ function paint(): void {
 		spoken = answer;
 	}
 	place(into.box, outlined.getBoundingClientRect());
-	follow(into.line, event.clientX, event.clientY);
-	into.wrap.hidden = false;
+	follow(into.label, event.clientX, event.clientY);
+	into.box.hidden = false;
+	into.label.hidden = false;
 	showing = true;
 }
 
 function moved(event: PointerEvent): void {
-	// This runs on every pointer move on the page, so alt not being held has to
-	// cost a boolean and nothing else.
-	if (!event.altKey) {
+	// This runs on every pointer move on the page, so neither alt being held nor
+	// the mode being off may cost more than a boolean.
+	if (!event.altKey && !inspecting()) {
 		hide();
 		return;
 	}
@@ -253,9 +284,9 @@ function moved(event: PointerEvent): void {
 }
 
 function released(event: KeyboardEvent): void {
-	// Any key-up that leaves alt up, not just alt's own: a hint that outlives
-	// the key that summoned it is worse than no hint.
-	if (!event.altKey) hide();
+	// Any key-up that leaves alt up, not just alt's own: a hint that outlives the
+	// key that summoned it is worse than no hint. The mode does not answer to alt.
+	if (!event.altKey && !inspecting()) hide();
 }
 
 /**
@@ -280,15 +311,18 @@ export function hide(): void {
 
 	if (!showing) return;
 	showing = false;
-	if (view) view.wrap.hidden = true;
+	if (view) {
+		view.box.hidden = true;
+		view.label.hidden = true;
+	}
 }
 
 /**
- * Trace whatever the pointer is over, for as long as alt is held.
+ * Trace whatever the pointer is over, while alt is held or the mode is on.
  *
- * The cheap preview beside the full panel: one line of answer and an outline,
- * so scanning a table is a movement rather than five hundred clicks. Called
- * once by `install()`; calling it again does nothing.
+ * The cheap preview beside the full panel: one glance of answer and an outline,
+ * so scanning a table is a movement rather than five hundred clicks. Called once
+ * by `install()`; calling it again does nothing.
  */
 export function watch(): void {
 	if (watching) return;
