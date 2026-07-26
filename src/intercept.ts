@@ -1,4 +1,4 @@
-import { recordResponse } from './store';
+import { findResponse, recordResponse } from './store';
 import { taint } from './taint';
 import type { RequestMeta } from './types';
 
@@ -18,7 +18,40 @@ interface Pending {
 const MAX_PENDING = 20;
 const pending: Pending[] = [];
 
-let patched = false;
+/**
+ * Marks a function as already ours.
+ *
+ * A module-level flag would miss the two cases that actually happen: two
+ * copies of this package in one dependency tree, and globals such as
+ * `XMLHttpRequest` that only exist after the first call.
+ */
+const PATCHED = Symbol.for('camefrom.patched');
+
+function mark<T extends object>(replacement: T): T {
+    Object.defineProperty(replacement, PATCHED, { value: true });
+    return replacement;
+}
+
+function isPatched(candidate: unknown): boolean {
+    return typeof candidate === 'function' && PATCHED in candidate;
+}
+
+/**
+ * Finds a property descriptor anywhere up the prototype chain.
+ *
+ * Accessors are not always where you expect them: happy-dom, jsdom and various
+ * polyfills subclass XMLHttpRequest, leaving `prototype` with nothing but a
+ * constructor while the real accessors sit on a parent.
+ */
+function inheritedDescriptor(target: object, key: string): PropertyDescriptor | undefined {
+    let holder: object | null = target;
+    while (holder) {
+        const descriptor = Object.getOwnPropertyDescriptor(holder, key);
+        if (descriptor) return descriptor;
+        holder = Object.getPrototypeOf(holder) as object | null;
+    }
+    return undefined;
+}
 
 function remember(text: string, meta: RequestMeta): void {
     pending.push({ text, meta });
@@ -42,6 +75,7 @@ const fetchMeta = new WeakMap<Response, RequestMeta>();
 
 function patchFetch(): void {
     if (typeof globalThis.fetch !== 'function' || typeof Response === 'undefined') return;
+    if (isPatched(globalThis.fetch)) return;
 
     const originalFetch = globalThis.fetch;
     const wrapped = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -58,39 +92,42 @@ function patchFetch(): void {
     };
     // Carries over whatever the runtime hung off fetch, such as Bun's
     // `preconnect`, so replacing it stays invisible.
-    globalThis.fetch = Object.assign(wrapped, originalFetch);
+    globalThis.fetch = mark(Object.assign(wrapped, originalFetch));
 
     const originalJson = Response.prototype.json;
-    Response.prototype.json = async function json(this: Response) {
+    Response.prototype.json = mark(async function json(this: Response) {
         const body: unknown = await originalJson.call(this);
         const meta = fetchMeta.get(this);
         return meta ? capture(meta, body) : body;
-    };
+    });
 
     const originalText = Response.prototype.text;
-    Response.prototype.text = async function text(this: Response) {
+    Response.prototype.text = mark(async function text(this: Response) {
         const body = await originalText.call(this);
         const meta = fetchMeta.get(this);
         if (meta) remember(body, meta);
         return body;
-    };
+    });
 }
 
 interface XhrMeta {
     method: string;
     url: string;
     startedAt: number;
+    /** responseText can be read many times; the body is only recorded once. */
+    remembered?: boolean;
 }
 
 const xhrMeta = new WeakMap<XMLHttpRequest, XhrMeta>();
 
 function patchXhr(): void {
     if (typeof XMLHttpRequest === 'undefined') return;
+    if (isPatched(XMLHttpRequest.prototype.open)) return;
 
     const originalOpen = XMLHttpRequest.prototype.open;
     const originalSend = XMLHttpRequest.prototype.send;
 
-    XMLHttpRequest.prototype.open = function open(
+    XMLHttpRequest.prototype.open = mark(function open(
         this: XMLHttpRequest,
         method: string,
         url: string | URL,
@@ -100,34 +137,54 @@ function patchXhr(): void {
     ): void {
         xhrMeta.set(this, { method, url: String(url), startedAt: 0 });
         originalOpen.call(this, method, url, isAsync, username, password);
-    };
+    });
 
-    XMLHttpRequest.prototype.send = function send(
+    XMLHttpRequest.prototype.send = mark(function send(
         this: XMLHttpRequest,
         body?: Document | XMLHttpRequestBodyInit | null
     ): void {
         const meta = xhrMeta.get(this);
-        if (meta) {
-            meta.startedAt = Date.now();
-            this.addEventListener('load', () => {
-                // Reading responseText throws for binary response types.
-                if (this.responseType !== '' && this.responseType !== 'text') return;
-                remember(this.responseText, {
+        if (meta) meta.startedAt = Date.now();
+        originalSend.call(this, body);
+    });
+
+    // Hooking the getter rather than the load event is deliberate. axios reads
+    // responseText from onreadystatechange, which fires before any load
+    // listener we could add, so an event-based hook is always too late and the
+    // body would be parsed before we ever saw it.
+    const descriptor = inheritedDescriptor(XMLHttpRequest.prototype, 'responseText');
+    const readOriginal = descriptor?.get;
+    if (!descriptor || !readOriginal) return;
+
+    // Defined on the class we were handed, shadowing the inherited accessor
+    // rather than mutating a prototype we do not own.
+    Object.defineProperty(XMLHttpRequest.prototype, 'responseText', {
+        ...descriptor,
+        get: mark(function responseText(this: XMLHttpRequest): string {
+            const text = readOriginal.call(this) as string;
+            const meta = xhrMeta.get(this);
+
+            if (meta && !meta.remembered && this.readyState === XMLHttpRequest.DONE && text !== '') {
+                meta.remembered = true;
+                remember(text, {
                     method: meta.method,
                     url: meta.url,
                     status: this.status,
                     startedAt: meta.startedAt,
                     durationMs: Date.now() - meta.startedAt
                 });
-            });
-        }
-        originalSend.call(this, body);
-    };
+            }
+
+            return text;
+        })
+    });
 }
 
 function patchJsonParse(): void {
+    if (isPatched(JSON.parse)) return;
+
     const originalParse = JSON.parse;
-    JSON.parse = ((text: string, reviver?: Parameters<typeof originalParse>[1]): unknown => {
+    JSON.parse = mark((text: string, reviver?: Parameters<typeof originalParse>[1]): unknown => {
         const result: unknown = originalParse(text, reviver);
         if (typeof text !== 'string') return result;
 
@@ -135,21 +192,23 @@ function patchJsonParse(): void {
         if (!entry) return result;
 
         // One HTTP response stays one recorded response, however many times
-        // the same body gets parsed.
-        entry.responseId ??= recordResponse(entry.meta, result).id;
+        // the same body gets parsed — unless it has since aged out of the
+        // store, in which case pointing at it would trace to nothing.
+        if (entry.responseId === undefined || !findResponse(entry.responseId)) {
+            entry.responseId = recordResponse(entry.meta, result).id;
+        }
         return taint(result, entry.responseId);
     }) as typeof JSON.parse;
 }
 
 /**
- * Start watching HTTP traffic.
+ * Start watching HTTP traffic. Safe to call more than once: each patch skips
+ * what it already replaced, and picks up anything that appeared since.
  *
  * Every patch calls through to the original and never swallows errors: MSW and
  * Sentry patch the same functions, and we must not care who got there first.
  */
 export function intercept(): void {
-    if (patched) return;
-    patched = true;
     patchFetch();
     patchXhr();
     patchJsonParse();
