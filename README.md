@@ -50,12 +50,18 @@ bun add -d camefrom
 
 ```ts
 // main.tsx
-import "camefrom";
+import { install } from "camefrom";
+
+install();
 ```
 
 That is the whole setup. No plugin, no config, no wrapper around your fetch
-client. In production builds the package resolves to a no-op through the
-`development` export condition, so nothing ships to your users.
+client, and no condition to remember around the call: outside development
+`install` is an empty function, so your bundler drops it and everything behind
+it. Nothing ships to your users.
+
+Call it before any library that patches `fetch` or `XMLHttpRequest`, or the
+responses it reads will not be recorded.
 
 ## Use
 

@@ -34,8 +34,7 @@
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"development": "./dist/index.js",
-			"default": "./dist/noop.js"
+			"default": "./dist/index.js"
 		},
 		"./package.json": "./package.json"
 	},
@@ -46,7 +45,7 @@
 	],
 	"scripts": {
 		"build": "bun run build:js && bun run build:types",
-		"build:js": "bun build ./src/index.ts ./src/noop.ts --outdir=dist --target=browser --format=esm --sourcemap=linked --packages=external",
+		"build:js": "bun build ./src/index.ts --outdir=dist --target=browser --format=esm --sourcemap=linked --packages=external --env=disable",
 		"build:types": "tsc -p tsconfig.build.json",
 		"typecheck": "tsc -p tsconfig.json",
 		"check": "biome check",
